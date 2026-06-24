@@ -5,18 +5,25 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 
+_HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+
+
 def override_validation_error(app: FastAPI, status_code: int = status.HTTP_400_BAD_REQUEST, handle_exceptions: bool = True) -> None:
     """
     Sovrascrive la gestione degli errori di validazione di FastAPI (di default 422).
 
-    Rispetta e preserva al 100% qualsiasi funzione `app.openapi` custom già definita 
+    Rispetta e preserva al 100% qualsiasi funzione `app.openapi` custom già definita
     dallo sviluppatore, applicando la patch in coda ad essa.
     """
     if status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
         return
 
+    # Controllo di sicurezza: se abbiamo già applicato l'override su questa app,
+    # usciamo immediatamente per prevenire handler duplicati e loop di ricorsione.
+    if getattr(app.state, "_validation_overridden", False):
+        return
+
     if handle_exceptions:
-        # 1. Gestore dell'eccezione a runtime
         @app.exception_handler(RequestValidationError)
         async def custom_validation_exception_handler(
                 _request: Request, exc: RequestValidationError
@@ -26,11 +33,6 @@ def override_validation_error(app: FastAPI, status_code: int = status.HTTP_400_B
                 content={"detail": jsonable_encoder(exc.errors())},
             )
 
-    # 2. Controllo di sicurezza: se abbiamo già applicato l'override su questa app, 
-    # usciamo immediatamente per prevenire loop di ricorsione infiniti.
-    if hasattr(app.openapi, "_validation_overridden"):
-        return
-
     target_code = str(status_code)
 
     # Salviamo il riferimento alla funzione openapi corrente dell'app.
@@ -38,16 +40,18 @@ def override_validation_error(app: FastAPI, status_code: int = status.HTTP_400_B
     original_openapi = app.openapi
 
     def custom_openapi() -> dict[str, Any] | None:
-        if app.openapi_schema:
-            return app.openapi_schema
-
-        # Eseguiamo la funzione originale: se il dev aveva aggiunto loghi, metadati 
-        # o schemi di sicurezza, qui verranno tutti generati correttamente.
+        # Deleghiamo interamente la gestione della cache a original_openapi().
+        # Se il dev segue il pattern documentato da FastAPI, qui la cache viene
+        # gestita correttamente. Noi patchiamo in-place il risultato.
         schema = original_openapi()
 
         # Applichiamo la nostra patch direttamente sul dizionario generato
         for _path, path_item in schema.get("paths", {}).items():
             for _method, operation in path_item.items():
+                if _method not in _HTTP_METHODS:
+                    # Salta chiavi non-operation (summary, description, servers, parameters…)
+                    continue
+
                 responses = operation.get("responses", {})
 
                 if "422" in responses:
@@ -80,6 +84,5 @@ def override_validation_error(app: FastAPI, status_code: int = status.HTTP_400_B
         app.openapi_schema = schema
         return app.openapi_schema
 
-    # Contrassegniamo la nostra funzione con un flag di controllo prima di iniettarla
-    setattr(custom_openapi, "_validation_overridden", True)
     app.openapi = custom_openapi
+    app.state._validation_overridden = True
