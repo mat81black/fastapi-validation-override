@@ -3,7 +3,7 @@
 set -e
 set -x
 
-mypy fastapi_router_versioning examples
-ty check fastapi_router_versioning examples
-ruff check fastapi_router_versioning tests examples
-ruff format fastapi_router_versioning tests examples --check
+mypy fastapi_validation_override examples
+ty check fastapi_validation_override examples
+ruff check fastapi_validation_override tests examples
+ruff format fastapi_validation_override tests examples --check
