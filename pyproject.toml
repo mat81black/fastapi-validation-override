@@ -30,7 +30,7 @@ classifiers = [
     "Typing :: Typed"
 ]
 dependencies = [
-    "fastapi >=0.120.0, !=0.137.0, !=0.137.1",
+    "fastapi >=0.120.0",
 ]
 
 [project.urls]
@@ -74,7 +74,7 @@ parallel = true
 data_file = "coverage/.coverage"
 source = [
     "fastapi_validation_override",
-    "tests"
+    "tests",
 ]
 relative_files = true
 context = '${CONTEXT}'
