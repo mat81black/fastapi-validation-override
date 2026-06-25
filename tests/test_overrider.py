@@ -7,12 +7,12 @@ from pydantic import BaseModel
 from fastapi_validation_override import override_validation_error
 
 
-class Item(BaseModel):
+class Item(BaseModel):  # pragma: no cover
     name: str
     price: float
 
 
-class ErrorModel(BaseModel):
+class ErrorModel(BaseModel):  # pragma: no cover
     message: str
 
 
