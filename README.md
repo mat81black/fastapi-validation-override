@@ -6,7 +6,7 @@
 
 Override FastAPI's default **422 Unprocessable Entity** validation error with any HTTP status code — both at runtime and in the OpenAPI schema.
 
-Call `override_validation_error(app)` once after defining your routes, and every validation error will return your chosen status code with the same `{"detail": [...]}` body that FastAPI produces by default.
+Call `override_validation_error(app)` once after defining your routes. Validation errors will return the chosen status code with the standard `{"detail": [...]}` body.
 
 ---
 
@@ -15,9 +15,9 @@ Call `override_validation_error(app)` once after defining your routes, and every
 - **Runtime + schema** — patches both the exception handler and the OpenAPI schema in one call
 - **Any status code** — use 400, 409, or any other code instead of 422
 - **Schema-aware merge** — if a route already declares a response at the target code, the validation error schema is merged using `anyOf`
-- **Custom OpenAPI preserved** — any `app.openapi` function you defined is called first; the patch is applied on top
-- **Bring your own handler** — set `handle_exceptions=False` to patch only the schema and handle the exception yourself
-- **Idempotent** — safe to call multiple times on the same app instance
+- **Custom OpenAPI preserved** — any `app.openapi` function already defined is called first; the patch is applied on top
+- **Custom exception handler** — set `handle_exceptions=False` to patch only the schema and handle the exception independently
+- **Idempotent calls** — safe to invoke multiple times on the same app instance
 
 ---
 
@@ -63,7 +63,7 @@ override_validation_error(app)
 # POST /items with missing fields -> 400 Bad Request {"detail": [...]}
 ```
 
-That's it. The default Swagger UI still shows the correct response schema — the `422` entry is replaced by `400` automatically.
+The `422` entry in the Swagger UI is replaced by `400` automatically.
 
 ---
 
@@ -77,7 +77,7 @@ override_validation_error(app, status_code=400, handle_exceptions=True)
 |---|---|---|---|
 | `app` | `FastAPI` | required | The FastAPI application instance to patch |
 | `status_code` | `int` | `400` | HTTP status code to use instead of 422 |
-| `handle_exceptions` | `bool` | `True` | If `True`, registers an exception handler that returns the custom status code at runtime. Set to `False` to patch only the OpenAPI schema and handle the exception yourself |
+| `handle_exceptions` | `bool` | `True` | If `True`, registers an exception handler that returns the custom status code at runtime. Set to `False` to patch only the OpenAPI schema and handle the exception independently |
 
 Calling with `status_code=422` is a no-op — the default FastAPI behaviour is preserved unchanged.
 
@@ -92,9 +92,9 @@ override_validation_error(app, status_code=409)
 # Validation errors -> 409 Conflict
 ```
 
-### Bring your own exception handler
+### Custom exception handler
 
-Set `handle_exceptions=False` when you need a custom response body format or additional logic on validation errors. The OpenAPI schema is still patched to show the correct status code.
+Set `handle_exceptions=False` to define a custom response body or add logic on validation errors. The OpenAPI schema is still patched to reflect the correct status code.
 
 ```python
 from fastapi import FastAPI, Request
@@ -120,9 +120,9 @@ async def custom_handler(request: Request, exc: RequestValidationError) -> JSONR
 override_validation_error(app, status_code=400, handle_exceptions=False)
 ```
 
-### Custom `app.openapi` preserved
+### Preserving a custom `app.openapi`
 
-If you have already replaced `app.openapi` with a custom function, `override_validation_error` wraps it — your function is called first and the patch is applied to its output.
+If `app.openapi` has been replaced with a custom function, `override_validation_error` wraps it — the custom function is called first and the patch is applied to its output.
 
 ```python
 from typing import Any
@@ -147,7 +147,7 @@ def custom_openapi() -> dict[str, Any]:
 app.openapi = custom_openapi  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
 
 override_validation_error(app)
-# x-logo is preserved; 422 is still replaced by 400 in the schema
+# x-logo is preserved; 422 is replaced by 400 in the schema
 ```
 
 ### Existing response at target code
@@ -182,9 +182,9 @@ override_validation_error(app)
 # responses.400.content.application/json.schema -> anyOf: [OutOfStockError, HTTPValidationError]
 ```
 
-### With `APIRouter`
+### Usage with `APIRouter`
 
-`override_validation_error` applies to the whole application, so it works regardless of how routes are organized.
+`override_validation_error` applies to the whole application, regardless of how routes are organized.
 
 ```python
 from fastapi import APIRouter, FastAPI
