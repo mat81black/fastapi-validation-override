@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 0.1.0 (2026-06-25)
+
 🚀 First official public release of **fastapi-validation-override**.
 
 Override FastAPI's default 422 validation error with any HTTP status code — patching both the runtime exception handler and the OpenAPI schema in a single call.
