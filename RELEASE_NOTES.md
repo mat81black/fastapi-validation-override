@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 0.1.2 (2026-07-09)
+
 ### Internal
 
 * 🔧 Integrate Codecov for coverage tracking and update README. PR [#15](https://github.com/mat81black/fastapi-validation-override/pull/15) by [@mat81black](https://github.com/mat81black).
