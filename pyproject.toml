@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "fastapi-validation-override"
 dynamic = ["version"]
-description = "Override FastAPI's 422 with any HTTP status code — at runtime and in the OpenAPI schema."
+description = "Override FastAPI's default 422 validation error with any HTTP status code, at runtime and in the OpenAPI schema."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -38,6 +38,8 @@ dependencies = [
 Homepage = "https://github.com/mat81black/fastapi-validation-override"
 Repository = "https://github.com/mat81black/fastapi-validation-override"
 Issues = "https://github.com/mat81black/fastapi-validation-override/issues"
+Documentation = "https://github.com/mat81black/fastapi-validation-override#readme"
+Changelog = "https://github.com/mat81black/fastapi-validation-override/blob/main/RELEASE_NOTES.md"
 
 [dependency-groups]
 dev = [
