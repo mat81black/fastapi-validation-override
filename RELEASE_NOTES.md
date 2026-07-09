@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 0.1.1 (2026-07-09)
+
 ### Docs
 
 * 📝 Rewrite README with PyPI-safe links and corrected project metadata. PR [#13](https://github.com/mat81black/fastapi-validation-override/pull/13) by [@mat81black](https://github.com/mat81black).
