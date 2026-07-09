@@ -1,6 +1,7 @@
 # FastAPI Validation Override
 
 [![Build Status](https://github.com/mat81black/fastapi-validation-override/workflows/Test/badge.svg)](https://github.com/mat81black/fastapi-validation-override/actions)
+[![codecov](https://codecov.io/github/mat81black/fastapi-validation-override/graph/badge.svg?token=SL4JPWAB0O)](https://codecov.io/github/mat81black/fastapi-validation-override)
 [![Package version](https://badge.fury.io/py/fastapi-validation-override.svg)](https://pypi.org/project/fastapi-validation-override/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/fastapi-validation-override.svg?color=%2334D058)](https://pypi.org/project/fastapi-validation-override/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/mat81black/fastapi-validation-override/blob/main/LICENSE)
