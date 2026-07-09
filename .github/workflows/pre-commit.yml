@@ -2,9 +2,6 @@ name: pre-commit
 
 on:
   pull_request:
-    types:
-      - opened
-      - synchronize
 
 permissions: {}
 
@@ -47,8 +44,8 @@ jobs:
         # Only lint files changed in this PR, not the entire repo
         run: uv run prek run --from-ref origin/${GITHUB_BASE_REF} --to-ref HEAD --show-diff-on-failure
 
-  # Required by GitHub branch protection rules
-  pre-commit-alls-green:
+  # https://github.com/marketplace/actions/alls-green#why
+  pre-commit-alls-green:  # This job does nothing and is only used for the branch protection
     if: always()
     needs:
       - pre-commit
