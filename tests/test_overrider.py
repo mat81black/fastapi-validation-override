@@ -355,3 +355,45 @@ async def test_guard_status_code_422_is_noop_schema() -> None:
 
     responses = schema["paths"]["/items"]["post"]["responses"]
     assert "422" in responses
+
+
+# ── runtime: query param ──────────────────────────────────────────────────────
+
+
+async def test_invalid_query_param_returns_target_status_code() -> None:
+    app = FastAPI()
+
+    @app.get("/items")
+    async def get_item(item_id: int) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+
+    async with _client(app) as client:
+        response = await client.get("/items", params={"item_id": "not-a-number"})
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+# ── schema: path con metodi multipli ─────────────────────────────────────────
+
+
+async def test_schema_multiple_methods_on_same_path_all_patched() -> None:
+    app = FastAPI()
+
+    @app.get("/items")
+    async def list_items(category: int) -> dict[str, Any]: ...
+
+    @app.post("/items")
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+
+    async with _client(app) as client:
+        schema = (await client.get("/openapi.json")).json()
+
+    get_responses = schema["paths"]["/items"]["get"]["responses"]
+    post_responses = schema["paths"]["/items"]["post"]["responses"]
+    assert "422" not in get_responses
+    assert "400" in get_responses
+    assert "422" not in post_responses
+    assert "400" in post_responses
