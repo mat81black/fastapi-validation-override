@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 0.1.3 (2026-07-10)
+
 ### Refactors
 
 * ♻️ Clarify idempotency guard comment to reflect actual behavior. PR [#17](https://github.com/mat81black/fastapi-validation-override/pull/17) by [@mat81black](https://github.com/mat81black).
