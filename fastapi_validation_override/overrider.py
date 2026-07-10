@@ -24,7 +24,7 @@ def override_validation_error(app: FastAPI, status_code: int = 400, handle_excep
     if status_code == 422:
         return
 
-    # Guard against duplicate handlers and infinite recursion on repeated calls.
+    # Guard against registering duplicate handlers and patches on repeated calls.
     if getattr(app.state, "_validation_overridden", False):
         return
 
