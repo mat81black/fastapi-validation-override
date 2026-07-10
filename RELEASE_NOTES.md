@@ -6,6 +6,10 @@
 
 * ♻️ Clarify idempotency guard comment to reflect actual behavior. PR [#17](https://github.com/mat81black/fastapi-validation-override/pull/17) by [@mat81black](https://github.com/mat81black).
 
+### Docs
+
+* 📝 Fix wrong package name in installation commands. PR [#19](https://github.com/mat81black/fastapi-validation-override/pull/19) by [@mat81black](https://github.com/mat81black).
+
 ### Internal
 
 * ✅ Add tests for query param validation and multi-method path patching. PR [#18](https://github.com/mat81black/fastapi-validation-override/pull/18) by [@mat81black](https://github.com/mat81black).
