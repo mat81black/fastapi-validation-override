@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 0.2.0 (2026-07-27)
+
 ### Features
 
 * ✨ Keep validation errors documented at the target code even with a custom 422 response. PR [#31](https://github.com/mat81black/fastapi-validation-override/pull/31) by [@mat81black](https://github.com/mat81black).
