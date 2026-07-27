@@ -2,6 +2,10 @@
 
 ## Latest Changes
 
+### Features
+
+* ✨ Add public patch_422_responses for schema patching outside override_validation_error. PR [#30](https://github.com/mat81black/fastapi-validation-override/pull/30) by [@mat81black](https://github.com/mat81black).
+
 ### Internal
 
 * 👷 Replace Dependabot pre-commit ecosystem with custom bump workflow. PR [#25](https://github.com/mat81black/fastapi-validation-override/pull/25) by [@mat81black](https://github.com/mat81black).
