@@ -13,6 +13,7 @@
 
 ### Internal
 
+* ⬆ Bump fastapi from 0.139.0 to 0.139.2. PR [#27](https://github.com/mat81black/fastapi-validation-override/pull/27) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * ⬆ Bump the python-packages group with 5 updates. PR [#26](https://github.com/mat81black/fastapi-validation-override/pull/26) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * 👷 Replace Dependabot pre-commit ecosystem with custom bump workflow. PR [#25](https://github.com/mat81black/fastapi-validation-override/pull/25) by [@mat81black](https://github.com/mat81black).
 * ⬆ Bump the python-packages group across 1 directory with 6 updates. PR [#24](https://github.com/mat81black/fastapi-validation-override/pull/24) by [@dependabot[bot]](https://github.com/apps/dependabot).
