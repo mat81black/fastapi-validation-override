@@ -13,6 +13,7 @@ FastAPI returns 422 Unprocessable Entity for every request validation failure. M
 - **Single call**: patches runtime exception handling and the OpenAPI schema at once
 - **Any status code**: use 400, 409, or any valid code instead of 422
 - **anyOf merge**: when a route already declares a response at the target code, the validation error schema is merged rather than overwritten
+- **Independent of a custom 422**: if a route keeps its own, non-validation 422 response, it's left untouched and the validation schema is still documented at the target code
 - **Custom openapi preserved**: wraps any `app.openapi` function already installed and applies the patch on top of its output
 - **Bring your own handler**: `handle_exceptions=False` skips the built-in handler while still patching the schema
 - **Idempotent**: safe to call multiple times on the same app instance
@@ -69,7 +70,7 @@ override_validation_error(app, status_code=409)
 ### `override_validation_error`
 
 ```python
-override_validation_error(app, status_code=400, handle_exceptions=True)
+override_validation_error(app, status_code=400, handle_exceptions=True, merge_target_response=True)
 ```
 
 | Parameter | Type | Default | Description |
@@ -77,17 +78,19 @@ override_validation_error(app, status_code=400, handle_exceptions=True)
 | `app` | `FastAPI` | required | The FastAPI application instance to patch |
 | `status_code` | `int` | `400` | HTTP status code to use instead of 422. Calling with `422` is a no-op |
 | `handle_exceptions` | `bool` | `True` | When `True`, registers an exception handler that returns the custom status code at runtime. Set to `False` to patch only the OpenAPI schema and handle the exception yourself |
+| `merge_target_response` | `bool` | `True` | When `True`, a response you already declared at `status_code` is merged with the validation error schema using `anyOf`. When `False`, it's left untouched |
 
 ### `patch_422_responses`
 
 ```python
-patch_422_responses(schema, target_code)
+patch_422_responses(schema, target_code, merge_target_response=True)
 ```
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `schema` | `dict[str, Any]` | required | An OpenAPI schema dict, such as one returned by `app.openapi()` |
-| `target_code` | `str` | required | The status code to replace `"422"` with, e.g. `"400"` |
+| `target_code` | `str` | required | The status code to document the validation error at, e.g. `"400"` |
+| `merge_target_response` | `bool` | `True` | Same as the `override_validation_error` parameter of the same name |
 
 The schema-patching logic that `override_validation_error` uses internally, exposed as a standalone function for advanced use cases, such as patching a schema inside your own custom `app.openapi` function without going through `override_validation_error`. Mutates `schema` in place and also returns it.
 
@@ -97,6 +100,8 @@ from fastapi_validation_override import patch_422_responses
 schema = app.openapi()
 patch_422_responses(schema, "400")
 ```
+
+What happens to 422 and what happens to `target_code` are decided independently: a FastAPI-generated 422 validation response is removed, any other response already declared at 422 is left untouched, and routes that need validation always get it documented at `target_code`, synthesized from FastAPI's own schema components if nothing is there yet. See [Independent 422 handling](#independent-422-handling) below.
 
 ### Custom exception handler
 
@@ -175,6 +180,36 @@ override_validation_error(app)
 # schema at 400: anyOf: [OutOfStockError, HTTPValidationError]
 ```
 
+Set `merge_target_response=False` to leave a response you already declared at the target code completely untouched instead of merging it with `anyOf`:
+
+```python
+override_validation_error(app, merge_target_response=False)
+```
+
+### Independent 422 handling
+
+A route can keep its own, non-validation 422 response. As long as the route has a body or parameters that FastAPI validates, it's left untouched at 422, and the validation error is still documented at the target code — independently of what occupies 422.
+
+```python
+class OutOfStockError(BaseModel):
+    error_code: str
+    item_name: str
+
+
+@app.post("/items", responses={422: {"model": OutOfStockError, "description": "Item is out of stock"}})
+async def create_item(item: Item) -> dict[str, object]:
+    return item.model_dump()
+
+
+override_validation_error(app)
+# 422 still documents OutOfStockError, untouched.
+# 400 is added automatically, documenting the validation error schema.
+```
+
+**This also applies at runtime.** If this route receives a request that fails validation, the exception handler still returns `target_code` (400 by default), not the custom 422 — `responses={422: ...}` only affects documentation, it never changes which exception handler FastAPI dispatches to. Your custom 422 response is for errors you raise yourself (like `OutOfStockError` above), not for request validation failures.
+
+> **Note:** when the validation schema is synthesized this way, `HTTPValidationError` and `ValidationError` are added to `components.schemas` if they aren't already there. If you snapshot-test your OpenAPI schema, expect these two component definitions to appear the first time this happens.
+
 ## Examples
 
 Runnable examples are in the [`examples/`](https://github.com/mat81black/fastapi-validation-override/tree/main/examples) directory:
@@ -186,6 +221,7 @@ Runnable examples are in the [`examples/`](https://github.com/mat81black/fastapi
 | [`handle_exceptions_false.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/handle_exceptions_false.py) | Custom exception handler with schema-only patch |
 | [`custom_openapi.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/custom_openapi.py) | Preserving a custom `app.openapi` function |
 | [`existing_response_at_target_code.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/existing_response_at_target_code.py) | `anyOf` merge when the target code is already declared |
+| [`custom_422_response.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/custom_422_response.py) | Keeping a custom, non-validation 422 response |
 | [`with_apirouter.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/with_apirouter.py) | Usage with multiple `APIRouter` instances |
 
 ## Release Notes
