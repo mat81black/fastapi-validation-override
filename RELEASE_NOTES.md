@@ -13,6 +13,7 @@
 
 ### Internal
 
+* ⬆ Bump pre-commit hooks. PR [#29](https://github.com/mat81black/fastapi-validation-override/pull/29) by [@mat81black](https://github.com/mat81black).
 * ⬆ Bump the github-actions group with 3 updates. PR [#28](https://github.com/mat81black/fastapi-validation-override/pull/28) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * ⬆ Bump fastapi from 0.139.0 to 0.139.2. PR [#27](https://github.com/mat81black/fastapi-validation-override/pull/27) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * ⬆ Bump the python-packages group with 5 updates. PR [#26](https://github.com/mat81black/fastapi-validation-override/pull/26) by [@dependabot[bot]](https://github.com/apps/dependabot).
