@@ -70,9 +70,9 @@ def patch_422_responses(
 
                 if "anyOf" in existing_schema:
                     if _VALIDATION_ERROR_REF not in existing_schema["anyOf"]:
-                        existing_schema["anyOf"].append(_VALIDATION_ERROR_REF)
+                        existing_schema["anyOf"].insert(0, _VALIDATION_ERROR_REF)
                 elif existing_schema and existing_schema != _VALIDATION_ERROR_REF:
-                    existing_content["schema"] = {"anyOf": [existing_schema, _VALIDATION_ERROR_REF]}
+                    existing_content["schema"] = {"anyOf": [_VALIDATION_ERROR_REF, existing_schema]}
                 elif not existing_schema:
                     existing_content["schema"] = _VALIDATION_ERROR_REF
 
