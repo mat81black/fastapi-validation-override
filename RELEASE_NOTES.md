@@ -4,6 +4,7 @@
 
 ### Features
 
+* ✨ Keep validation errors documented at the target code even with a custom 422 response. PR [#31](https://github.com/mat81black/fastapi-validation-override/pull/31) by [@mat81black](https://github.com/mat81black).
 * ✨ Add public patch_422_responses for schema patching outside override_validation_error. PR [#30](https://github.com/mat81black/fastapi-validation-override/pull/30) by [@mat81black](https://github.com/mat81black).
 
 ### Internal
