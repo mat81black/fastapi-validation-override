@@ -4,7 +4,7 @@ from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel
 
-from fastapi_validation_override import override_validation_error
+from fastapi_validation_override import override_validation_error, patch_422_responses
 
 
 class Item(BaseModel):  # pragma: no cover
@@ -397,3 +397,169 @@ async def test_schema_multiple_methods_on_same_path_all_patched() -> None:
     assert "400" in get_responses
     assert "422" not in post_responses
     assert "400" in post_responses
+
+
+# ── patch_422_responses: unit tests ─────────────────────────────────────────
+
+
+def _operation_with_422(**extra_responses: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "responses": {
+            "422": {
+                "description": "Validation Error",
+                "content": {
+                    "application/json": {
+                        "schema": {"$ref": "#/components/schemas/HTTPValidationError"},
+                    },
+                },
+            },
+            **extra_responses,
+        }
+    }
+
+
+def test_patch_422_moves_to_target_code_when_no_existing_response() -> None:
+    schema = {"paths": {"/items": {"post": _operation_with_422()}}}
+
+    result = patch_422_responses(schema, "400")
+
+    responses = result["paths"]["/items"]["post"]["responses"]
+    assert "422" not in responses
+    assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
+
+
+def test_patch_422_sets_schema_when_existing_response_has_no_schema() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(**{"400": {"description": "Custom Bad Request"}}),
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
+    assert response_400["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
+    assert response_400["description"] == "Custom Bad Request / Validation Error"
+
+
+def test_patch_422_creates_anyof_when_existing_response_has_schema() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(
+                    **{
+                        "400": {
+                            "description": "Out of stock",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/OutOfStockError"},
+                                }
+                            },
+                        }
+                    }
+                ),
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    content_schema = result["paths"]["/items"]["post"]["responses"]["400"]["content"]["application/json"]["schema"]
+    assert "anyOf" in content_schema
+    assert len(content_schema["anyOf"]) == 2
+
+
+def test_patch_422_appends_to_existing_anyof() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(
+                    **{
+                        "400": {
+                            "description": "Error",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"anyOf": [{"$ref": "#/components/schemas/OutOfStockError"}]},
+                                }
+                            },
+                        }
+                    }
+                ),
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    content_schema = result["paths"]["/items"]["post"]["responses"]["400"]["content"]["application/json"]["schema"]
+    assert len(content_schema["anyOf"]) == 2
+
+
+def test_patch_422_ignores_response_not_referencing_http_validation_error() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "422": {
+                            "description": "Custom",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/SomethingElse"},
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    responses = result["paths"]["/items"]["post"]["responses"]
+    assert "422" in responses
+    assert "400" not in responses
+
+
+def test_patch_422_ignores_non_http_method_keys_in_path_item() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "parameters": [{"name": "shared", "in": "query"}],
+                "post": _operation_with_422(),
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    path_item = result["paths"]["/items"]
+    assert path_item["parameters"] == [{"name": "shared", "in": "query"}]
+    assert "400" in path_item["post"]["responses"]
+
+
+def test_patch_422_noop_when_no_422_present() -> None:
+    schema = {"paths": {"/items": {"get": {"responses": {"200": {"description": "OK"}}}}}}
+
+    result = patch_422_responses(schema, "400")
+
+    assert result["paths"]["/items"]["get"]["responses"] == {"200": {"description": "OK"}}
+
+
+def test_patch_422_noop_when_no_paths() -> None:
+    schema: dict[str, Any] = {"info": {"title": "Test"}}
+
+    result = patch_422_responses(schema, "400")
+
+    assert result == {"info": {"title": "Test"}}
+
+
+def test_patch_422_returns_same_object_mutated_in_place() -> None:
+    schema = {"paths": {"/items": {"post": _operation_with_422()}}}
+
+    result = patch_422_responses(schema, "400")
+
+    assert result is schema

@@ -78,6 +78,26 @@ override_validation_error(app, status_code=400, handle_exceptions=True)
 | `status_code` | `int` | `400` | HTTP status code to use instead of 422. Calling with `422` is a no-op |
 | `handle_exceptions` | `bool` | `True` | When `True`, registers an exception handler that returns the custom status code at runtime. Set to `False` to patch only the OpenAPI schema and handle the exception yourself |
 
+### `patch_422_responses`
+
+```python
+patch_422_responses(schema, target_code)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `schema` | `dict[str, Any]` | required | An OpenAPI schema dict, such as one returned by `app.openapi()` |
+| `target_code` | `str` | required | The status code to replace `"422"` with, e.g. `"400"` |
+
+The schema-patching logic that `override_validation_error` uses internally, exposed as a standalone function for advanced use cases, such as patching a schema inside your own custom `app.openapi` function without going through `override_validation_error`. Mutates `schema` in place and also returns it.
+
+```python
+from fastapi_validation_override import patch_422_responses
+
+schema = app.openapi()
+patch_422_responses(schema, "400")
+```
+
 ### Custom exception handler
 
 Set `handle_exceptions=False` when you need a custom response body or additional logic. The OpenAPI schema is still patched.

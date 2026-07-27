@@ -8,6 +8,52 @@ from fastapi.responses import JSONResponse
 _HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 
 
+def patch_422_responses(schema: dict[str, Any], target_code: str) -> dict[str, Any]:
+    """
+    Replace every 422 validation error response in the schema with `target_code`.
+
+    Mutates `schema` in place and returns it. When `target_code` already has a response,
+    the validation error schema is merged into it using `anyOf` instead of being overwritten.
+    """
+    for _path, path_item in schema.get("paths", {}).items():
+        for _method, operation in path_item.items():
+            if _method not in _HTTP_METHODS:
+                # path_item may contain non-operation keys: summary, description, servers, parameters
+                continue
+
+            responses = operation.get("responses", {})
+
+            if "422" in responses:
+                response_422 = responses["422"]
+                content_422 = response_422.get("content", {}).get("application/json", {})
+                schema_422 = content_422.get("schema", {})
+                ref = schema_422.get("$ref", "")
+
+                if ref.endswith("HTTPValidationError"):
+                    if target_code in responses:
+                        existing_response = responses[target_code]
+                        existing_content = existing_response.setdefault("content", {}).setdefault(
+                            "application/json", {}
+                        )
+                        existing_schema = existing_content.setdefault("schema", {})
+
+                        if "anyOf" in existing_schema:
+                            existing_schema["anyOf"].append(schema_422)
+                        elif existing_schema:
+                            existing_content["schema"] = {"anyOf": [existing_schema, schema_422]}
+                        else:
+                            existing_content["schema"] = schema_422
+
+                        old_desc = existing_response.get("description", "Error")
+                        existing_response["description"] = f"{old_desc} / Validation Error"
+
+                        del responses["422"]
+                    else:
+                        responses[target_code] = responses.pop("422")
+
+    return schema
+
+
 def override_validation_error(app: FastAPI, status_code: int = 400, handle_exceptions: bool = True) -> None:
     """
     Override FastAPI's default 422 validation error response with a custom status code.
@@ -41,44 +87,7 @@ def override_validation_error(app: FastAPI, status_code: int = 400, handle_excep
     original_openapi = app.openapi
 
     def custom_openapi() -> dict[str, Any]:
-        schema = original_openapi()
-
-        for _path, path_item in schema.get("paths", {}).items():
-            for _method, operation in path_item.items():
-                if _method not in _HTTP_METHODS:
-                    # path_item may contain non-operation keys: summary, description, servers, parameters
-                    continue
-
-                responses = operation.get("responses", {})
-
-                if "422" in responses:
-                    response_422 = responses["422"]
-                    content_422 = response_422.get("content", {}).get("application/json", {})
-                    schema_422 = content_422.get("schema", {})
-                    ref = schema_422.get("$ref", "")
-
-                    if ref.endswith("HTTPValidationError"):
-                        if target_code in responses:
-                            existing_response = responses[target_code]
-                            existing_content = existing_response.setdefault("content", {}).setdefault(
-                                "application/json", {}
-                            )
-                            existing_schema = existing_content.setdefault("schema", {})
-
-                            if "anyOf" in existing_schema:
-                                existing_schema["anyOf"].append(schema_422)
-                            elif existing_schema:
-                                existing_content["schema"] = {"anyOf": [existing_schema, schema_422]}
-                            else:
-                                existing_content["schema"] = schema_422
-
-                            old_desc = existing_response.get("description", "Error")
-                            existing_response["description"] = f"{old_desc} / Validation Error"
-
-                            del responses["422"]
-                        else:
-                            responses[target_code] = responses.pop("422")
-
+        schema = patch_422_responses(original_openapi(), target_code)
         app.openapi_schema = schema
         return app.openapi_schema
 
