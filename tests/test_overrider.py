@@ -401,9 +401,11 @@ async def test_schema_multiple_methods_on_same_path_all_patched() -> None:
 
 # ── patch_422_responses: unit tests ─────────────────────────────────────────
 
+_REQUEST_BODY = {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Item"}}}}
 
-def _operation_with_422(**extra_responses: dict[str, Any]) -> dict[str, Any]:
-    return {
+
+def _operation_with_422(needs_validation: bool = True, **extra_responses: dict[str, Any]) -> dict[str, Any]:
+    operation: dict[str, Any] = {
         "responses": {
             "422": {
                 "description": "Validation Error",
@@ -416,6 +418,9 @@ def _operation_with_422(**extra_responses: dict[str, Any]) -> dict[str, Any]:
             **extra_responses,
         }
     }
+    if needs_validation:
+        operation["requestBody"] = _REQUEST_BODY
+    return operation
 
 
 def test_patch_422_moves_to_target_code_when_no_existing_response() -> None:
@@ -563,3 +568,230 @@ def test_patch_422_returns_same_object_mutated_in_place() -> None:
     result = patch_422_responses(schema, "400")
 
     assert result is schema
+
+
+# ── patch_422_responses: 422 e target_code sono indipendenti ────────────────
+
+
+def test_patch_422_synthesizes_target_when_no_422_present_but_validation_needed() -> None:
+    schema = {"paths": {"/items": {"post": {"responses": {}, "requestBody": _REQUEST_BODY}}}}
+
+    result = patch_422_responses(schema, "400")
+
+    responses = result["paths"]["/items"]["post"]["responses"]
+    assert "422" not in responses
+    assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
+
+
+def test_patch_422_synthesis_registers_components() -> None:
+    schema = {"paths": {"/items": {"post": {"responses": {}, "requestBody": _REQUEST_BODY}}}}
+
+    result = patch_422_responses(schema, "400")
+
+    schemas = result["components"]["schemas"]
+    assert "HTTPValidationError" in schemas
+    assert "ValidationError" in schemas
+
+
+def test_patch_422_no_synthesis_when_operation_does_not_need_validation() -> None:
+    schema = {"paths": {"/items": {"get": {"responses": {}}}}}
+
+    result = patch_422_responses(schema, "400")
+
+    assert "components" not in result
+    assert result["paths"]["/items"]["get"]["responses"] == {}
+
+
+def test_patch_422_custom_422_left_untouched_and_target_still_synthesized() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "422": {
+                            "description": "Domain-specific error, unrelated to validation",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MyCustom422"}}},
+                        }
+                    },
+                    "requestBody": _REQUEST_BODY,
+                }
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    responses = result["paths"]["/items"]["post"]["responses"]
+    assert responses["422"]["content"]["application/json"]["schema"]["$ref"].endswith("MyCustom422")
+    assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
+
+
+# ── patch_422_responses: merge_target_response=False ─────────────────────────
+
+
+def test_patch_422_merge_target_response_false_leaves_existing_target_untouched() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(
+                    **{
+                        "400": {
+                            "description": "Out of stock",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/OutOfStockError"},
+                                }
+                            },
+                        }
+                    }
+                ),
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400", merge_target_response=False)
+
+    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
+    assert response_400["content"]["application/json"]["schema"]["$ref"].endswith("OutOfStockError")
+    assert response_400["description"] == "Out of stock"
+
+
+def test_patch_422_merge_target_response_false_still_removes_native_422() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(**{"400": {"description": "Out of stock"}}),
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400", merge_target_response=False)
+
+    assert "422" not in result["paths"]["/items"]["post"]["responses"]
+
+
+def test_patch_422_merge_target_response_false_still_synthesizes_when_target_absent() -> None:
+    schema = {"paths": {"/items": {"post": _operation_with_422()}}}
+
+    result = patch_422_responses(schema, "400", merge_target_response=False)
+
+    responses = result["paths"]["/items"]["post"]["responses"]
+    assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
+
+
+# ── patch_422_responses: idempotenza su schema già patchato ─────────────────
+
+
+def test_patch_422_running_twice_on_already_patched_schema_does_not_duplicate() -> None:
+    schema = {"paths": {"/items": {"post": _operation_with_422()}}}
+
+    patch_422_responses(schema, "400")
+    patch_422_responses(schema, "400")
+
+    response_400 = schema["paths"]["/items"]["post"]["responses"]["400"]
+    assert "anyOf" not in response_400["content"]["application/json"]["schema"]
+    assert response_400["description"].count("Validation Error") == 1
+
+
+def test_patch_422_running_twice_on_already_merged_anyof_does_not_duplicate() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(
+                    **{
+                        "400": {
+                            "description": "Out of stock",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/OutOfStockError"},
+                                }
+                            },
+                        }
+                    }
+                ),
+            }
+        }
+    }
+
+    patch_422_responses(schema, "400")
+    patch_422_responses(schema, "400")
+
+    content_schema = schema["paths"]["/items"]["post"]["responses"]["400"]["content"]["application/json"]["schema"]
+    assert len(content_schema["anyOf"]) == 2
+
+
+# ── override_validation_error: 422 custom + target sintetizzato (end-to-end) ─
+
+
+async def test_custom_422_left_untouched_and_target_synthesized_end_to_end() -> None:
+    app = FastAPI()
+
+    class MyCustom422(BaseModel):  # pragma: no cover
+        error_code: str
+
+    @app.post("/items", responses={422: {"model": MyCustom422, "description": "My custom 422"}})
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+
+    async with _client(app) as client:
+        schema = (await client.get("/openapi.json")).json()
+
+    responses = schema["paths"]["/items"]["post"]["responses"]
+    assert responses["422"]["content"]["application/json"]["schema"]["$ref"].endswith("MyCustom422")
+    assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
+    assert "HTTPValidationError" in schema["components"]["schemas"]
+    assert "ValidationError" in schema["components"]["schemas"]
+
+
+async def test_custom_422_left_untouched_runtime_still_returns_target_code() -> None:
+    app = FastAPI()
+
+    class MyCustom422(BaseModel):  # pragma: no cover
+        error_code: str
+
+    @app.post("/items", responses={422: {"model": MyCustom422, "description": "My custom 422"}})
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+
+    async with _client(app) as client:
+        response = await client.post("/items", json={"name": "test"})  # missing price -> real validation error
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "detail" in response.json()
+
+
+# ── override_validation_error: merge_target_response=False (end-to-end) ─────
+
+
+async def test_merge_target_response_false_leaves_declared_response_untouched() -> None:
+    app = FastAPI()
+
+    @app.post("/items", responses={400: {"description": "Custom Bad Request"}})
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST, merge_target_response=False)
+
+    async with _client(app) as client:
+        schema = (await client.get("/openapi.json")).json()
+
+    response_400 = schema["paths"]["/items"]["post"]["responses"]["400"]
+    assert response_400["description"] == "Custom Bad Request"
+    assert "content" not in response_400
+
+
+async def test_merge_target_response_false_still_synthesizes_when_target_undeclared() -> None:
+    app = FastAPI()
+
+    @app.post("/items")
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST, merge_target_response=False)
+
+    async with _client(app) as client:
+        schema = (await client.get("/openapi.json")).json()
+
+    responses = schema["paths"]["/items"]["post"]["responses"]
+    assert "422" not in responses
+    assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")

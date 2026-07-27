@@ -3,58 +3,101 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.constants import REF_PREFIX
+from fastapi.openapi.utils import validation_error_definition, validation_error_response_definition
 from fastapi.responses import JSONResponse
 
 _HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+_VALIDATION_ERROR_REF = {"$ref": f"{REF_PREFIX}HTTPValidationError"}
 
 
-def patch_422_responses(schema: dict[str, Any], target_code: str) -> dict[str, Any]:
+def _operation_needs_validation(operation: dict[str, Any]) -> bool:
+    return bool(operation.get("requestBody")) or bool(operation.get("parameters"))
+
+
+def _ensure_validation_components(schema: dict[str, Any]) -> None:
+    components = schema.setdefault("components", {}).setdefault("schemas", {})
+    components.setdefault("ValidationError", validation_error_definition)
+    components.setdefault("HTTPValidationError", validation_error_response_definition)
+
+
+def patch_422_responses(
+    schema: dict[str, Any], target_code: str, *, merge_target_response: bool = True
+) -> dict[str, Any]:
     """
-    Replace every 422 validation error response in the schema with `target_code`.
+    Ensure every operation that can raise a validation error documents it at `target_code` instead of 422.
 
-    Mutates `schema` in place and returns it. When `target_code` already has a response,
-    the validation error schema is merged into it using `anyOf` instead of being overwritten.
+    What happens to 422 and what happens to `target_code` are decided independently:
+
+    - If an operation has a FastAPI-generated 422 validation response, it is removed. Any other
+      response already declared at 422 (unrelated to validation) is left untouched.
+    - If the operation needs request validation (it declares a body or parameters) and
+      `target_code` doesn't already document the validation schema, it is added there,
+      synthesizing it from FastAPI's own component definitions if necessary. When `target_code`
+      already has a response declared, `merge_target_response` controls the outcome: if True,
+      the validation schema is merged into it using `anyOf`; if False, the existing response is
+      left untouched, mirroring how FastAPI itself treats a response you already declared at 422.
+
+    Mutates `schema` in place and returns it.
     """
+    components_ensured = False
+
     for _path, path_item in schema.get("paths", {}).items():
         for _method, operation in path_item.items():
             if _method not in _HTTP_METHODS:
                 # path_item may contain non-operation keys: summary, description, servers, parameters
                 continue
 
-            responses = operation.get("responses", {})
+            responses = operation.setdefault("responses", {})
 
-            if "422" in responses:
-                response_422 = responses["422"]
+            response_422 = responses.get("422")
+            if response_422 is not None:
                 content_422 = response_422.get("content", {}).get("application/json", {})
-                schema_422 = content_422.get("schema", {})
-                ref = schema_422.get("$ref", "")
-
+                ref = content_422.get("schema", {}).get("$ref", "")
                 if ref.endswith("HTTPValidationError"):
-                    if target_code in responses:
-                        existing_response = responses[target_code]
-                        existing_content = existing_response.setdefault("content", {}).setdefault(
-                            "application/json", {}
-                        )
-                        existing_schema = existing_content.setdefault("schema", {})
+                    del responses["422"]
 
-                        if "anyOf" in existing_schema:
-                            existing_schema["anyOf"].append(schema_422)
-                        elif existing_schema:
-                            existing_content["schema"] = {"anyOf": [existing_schema, schema_422]}
-                        else:
-                            existing_content["schema"] = schema_422
+            if not _operation_needs_validation(operation):
+                continue
 
-                        old_desc = existing_response.get("description", "Error")
-                        existing_response["description"] = f"{old_desc} / Validation Error"
+            if target_code in responses:
+                if not merge_target_response:
+                    continue
 
-                        del responses["422"]
-                    else:
-                        responses[target_code] = responses.pop("422")
+                existing_response = responses[target_code]
+                existing_content = existing_response.setdefault("content", {}).setdefault("application/json", {})
+                existing_schema = existing_content.setdefault("schema", {})
+
+                if "anyOf" in existing_schema:
+                    if _VALIDATION_ERROR_REF not in existing_schema["anyOf"]:
+                        existing_schema["anyOf"].append(_VALIDATION_ERROR_REF)
+                elif existing_schema and existing_schema != _VALIDATION_ERROR_REF:
+                    existing_content["schema"] = {"anyOf": [existing_schema, _VALIDATION_ERROR_REF]}
+                elif not existing_schema:
+                    existing_content["schema"] = _VALIDATION_ERROR_REF
+
+                old_desc = existing_response.get("description", "Error")
+                if "Validation Error" not in old_desc:
+                    existing_response["description"] = f"{old_desc} / Validation Error"
+            else:
+                responses[target_code] = {
+                    "description": "Validation Error",
+                    "content": {"application/json": {"schema": _VALIDATION_ERROR_REF}},
+                }
+
+            if not components_ensured:
+                _ensure_validation_components(schema)
+                components_ensured = True
 
     return schema
 
 
-def override_validation_error(app: FastAPI, status_code: int = 400, handle_exceptions: bool = True) -> None:
+def override_validation_error(
+    app: FastAPI,
+    status_code: int = 400,
+    handle_exceptions: bool = True,
+    merge_target_response: bool = True,
+) -> None:
     """
     Override FastAPI's default 422 validation error response with a custom status code.
 
@@ -66,6 +109,9 @@ def override_validation_error(app: FastAPI, status_code: int = 400, handle_excep
     :param handle_exceptions: If True, registers an exception handler that returns the custom
         status code at runtime. Set to False to patch only the OpenAPI schema and
         handle the exception yourself.
+    :param merge_target_response: If True (default), a response you already declared at
+        `status_code` is merged with the validation error schema using `anyOf`. If False,
+        it is left untouched.
     """
     if status_code == 422:
         return
@@ -87,7 +133,7 @@ def override_validation_error(app: FastAPI, status_code: int = 400, handle_excep
     original_openapi = app.openapi
 
     def custom_openapi() -> dict[str, Any]:
-        schema = patch_422_responses(original_openapi(), target_code)
+        schema = patch_422_responses(original_openapi(), target_code, merge_target_response=merge_target_response)
         app.openapi_schema = schema
         return app.openapi_schema
 
