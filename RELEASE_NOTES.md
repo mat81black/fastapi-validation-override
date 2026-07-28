@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 1.0.0 (2026-07-28)
+
 🎉 First stable release of fastapi-validation-override.
 
 ## 0.2.0 (2026-07-27)
