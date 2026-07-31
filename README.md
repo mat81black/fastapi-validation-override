@@ -213,6 +213,8 @@ override_validation_error(app)
 
 > **Note:** when the validation schema is synthesized this way, `HTTPValidationError` and `ValidationError` are added to `components.schemas` if they aren't already there. If you snapshot-test your OpenAPI schema, expect these two component definitions to appear the first time this happens.
 
+> **Known limitation:** a parameter declared with `include_in_schema=False` still triggers validation at runtime, but it's invisible in the generated schema. If such a route *also* declares its own response at 422, `4XX`, or `default`, FastAPI never emits its own 422 response for that operation — the only signal this library relies on to detect that the route needs validation in the first place. In that specific combination, `target_code` won't be documented, even though the route can still return it at runtime.
+
 ## Examples
 
 Runnable examples are in the [`examples/`](https://github.com/mat81black/fastapi-validation-override/tree/main/examples) directory:
