@@ -12,6 +12,7 @@ FastAPI returns 422 Unprocessable Entity for every request validation failure. M
 
 - **Single call**: patches runtime exception handling and the OpenAPI schema at once
 - **Any status code**: use 400, 409, or any valid code instead of 422
+- **Full schema coverage**: patches paths, webhooks, and callbacks alike, so the schema stays internally consistent
 - **anyOf merge**: when a route already declares a response at the target code, the validation error schema is merged rather than overwritten
 - **Independent of a custom 422**: if a route keeps its own, non-validation 422 response, it's left untouched and the validation schema is still documented at the target code
 - **Custom openapi preserved**: wraps any `app.openapi` function already installed and applies the patch on top of its output

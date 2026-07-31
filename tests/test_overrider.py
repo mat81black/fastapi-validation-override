@@ -795,3 +795,96 @@ async def test_merge_target_response_false_still_synthesizes_when_target_undecla
     responses = schema["paths"]["/items"]["post"]["responses"]
     assert "422" not in responses
     assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
+
+
+def test_patch_422_webhooks_are_patched() -> None:
+    schema = {
+        "paths": {},
+        "webhooks": {
+            "new-item": {"post": _operation_with_422()},
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    responses = result["webhooks"]["new-item"]["post"]["responses"]
+    assert "422" not in responses
+    assert "400" in responses
+
+
+def test_patch_422_callbacks_are_patched() -> None:
+    main_operation = _operation_with_422()
+    main_operation["callbacks"] = {
+        "myCallback": {
+            "{$callback_url}": {"post": _operation_with_422()},
+        }
+    }
+    schema = {"paths": {"/items": {"post": main_operation}}}
+
+    result = patch_422_responses(schema, "400")
+
+    callback_responses = result["paths"]["/items"]["post"]["callbacks"]["myCallback"]["{$callback_url}"]["post"][
+        "responses"
+    ]
+    assert "422" not in callback_responses
+    assert "400" in callback_responses
+    # the main path is patched independently of the callback, not as a side effect of patching it
+    assert "400" in result["paths"]["/items"]["post"]["responses"]
+
+
+def test_patch_422_skips_non_dict_entries_in_webhooks_and_callbacks() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": {
+                    "responses": {},
+                    "requestBody": _REQUEST_BODY,
+                    "callbacks": {
+                        "broken": "not-a-dict",
+                        "ok": {"{$callback_url}": {"post": _operation_with_422()}},
+                    },
+                }
+            }
+        },
+        "webhooks": {
+            "broken": "not-a-dict",
+            "new-item": {"post": _operation_with_422()},
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    assert "400" in result["webhooks"]["new-item"]["post"]["responses"]
+    assert "400" in result["paths"]["/items"]["post"]["callbacks"]["ok"]["{$callback_url}"]["post"]["responses"]
+
+
+async def test_webhooks_and_callbacks_patched_end_to_end() -> None:
+    from fastapi import APIRouter
+
+    callback_router: APIRouter = APIRouter()
+
+    @callback_router.post("{$callback_url}/done")
+    async def done(item: Item) -> None: ...
+
+    app = FastAPI()
+
+    @app.post("/items", callbacks=callback_router.routes)
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    @app.webhooks.post("new-item")
+    async def new_item(item: Item) -> None:
+        """Webhook notification."""
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+
+    async with _client(app) as client:
+        schema = (await client.get("/openapi.json")).json()
+
+    webhook_responses = schema["webhooks"]["new-item"]["post"]["responses"]
+    assert "422" not in webhook_responses
+    assert "400" in webhook_responses
+
+    callback_paths = schema["paths"]["/items"]["post"]["callbacks"]["done"]
+    callback_operation = next(iter(callback_paths.values()))["post"]
+    assert "422" not in callback_operation["responses"]
+    assert "400" in callback_operation["responses"]
