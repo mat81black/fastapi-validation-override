@@ -761,6 +761,64 @@ def test_resolve_validation_ref_renames_only_http_validation_error_on_its_own_co
     assert schemas["ValidationError"] == fastapi_openapi_utils.validation_error_definition
 
 
+def test_resolve_validation_ref_reads_definitions_dynamically() -> None:
+    """fastapibase reassigns these globals for i18n before calling override_validation_error;
+    a frozen import would keep using the original English definitions instead."""
+    custom_validation_error = {"title": "ErroreValidazione", "type": "object", "properties": {"codice": {}}}
+    custom_http_validation_error = {
+        "title": "ErroreHTTPValidazione",
+        "type": "object",
+        "properties": {"dettagli": {"type": "array", "items": {"$ref": f"{REF_PREFIX}ValidationError"}}},
+    }
+    original_validation_error = fastapi_openapi_utils.validation_error_definition
+    original_http_validation_error = fastapi_openapi_utils.validation_error_response_definition
+    try:
+        fastapi_openapi_utils.validation_error_definition = custom_validation_error
+        fastapi_openapi_utils.validation_error_response_definition = custom_http_validation_error
+
+        schema: dict[str, Any] = {}
+        ref, name = overrider_module._resolve_validation_ref(schema)
+    finally:
+        fastapi_openapi_utils.validation_error_definition = original_validation_error
+        fastapi_openapi_utils.validation_error_response_definition = original_http_validation_error
+
+    assert name == "HTTPValidationError"
+    assert ref == {"$ref": f"{REF_PREFIX}HTTPValidationError"}
+    schemas = schema["components"]["schemas"]
+    assert schemas["ValidationError"] == custom_validation_error
+    assert schemas["HTTPValidationError"] == custom_http_validation_error
+
+
+async def test_override_validation_error_honors_definitions_monkeypatched_before_call() -> None:
+    custom_validation_error = {"title": "ErroreValidazione", "type": "object", "properties": {"codice": {}}}
+    custom_http_validation_error = {
+        "title": "ErroreHTTPValidazione",
+        "type": "object",
+        "properties": {"dettagli": {"type": "array", "items": {"$ref": f"{REF_PREFIX}ValidationError"}}},
+    }
+    original_validation_error = fastapi_openapi_utils.validation_error_definition
+    original_http_validation_error = fastapi_openapi_utils.validation_error_response_definition
+    fastapi_openapi_utils.validation_error_definition = custom_validation_error
+    fastapi_openapi_utils.validation_error_response_definition = custom_http_validation_error
+    try:
+        app = FastAPI()
+
+        @app.post("/items")
+        async def create_item(item: Item) -> dict[str, Any]: ...
+
+        override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+
+        async with _client(app) as client:
+            schema = (await client.get("/openapi.json")).json()
+    finally:
+        fastapi_openapi_utils.validation_error_definition = original_validation_error
+        fastapi_openapi_utils.validation_error_response_definition = original_http_validation_error
+
+    schemas = schema["components"]["schemas"]
+    assert schemas["ValidationError"] == custom_validation_error
+    assert schemas["HTTPValidationError"] == custom_http_validation_error
+
+
 # ── patch_422_responses: merge_target_response=False ─────────────────────────
 
 
