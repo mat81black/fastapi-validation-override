@@ -1,10 +1,13 @@
 from typing import Any
 
+import fastapi.openapi.utils as fastapi_openapi_utils
+
 from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel
 
 from fastapi_validation_override import override_validation_error, patch_422_responses
+from fastapi_validation_override import overrider as overrider_module
 
 
 class Item(BaseModel):  # pragma: no cover
@@ -888,3 +891,51 @@ async def test_webhooks_and_callbacks_patched_end_to_end() -> None:
     callback_operation = next(iter(callback_paths.values()))["post"]
     assert "422" not in callback_operation["responses"]
     assert "400" in callback_operation["responses"]
+
+
+def test_target_schema_not_shared_across_routes() -> None:
+    app = FastAPI()
+
+    @app.post("/a")
+    async def a(item: Item) -> dict[str, Any]: ...
+
+    @app.post("/b")
+    async def b(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app)
+    schema = app.openapi()
+
+    schema_a = schema["paths"]["/a"]["post"]["responses"]["400"]["content"]["application/json"]["schema"]
+    schema_b = schema["paths"]["/b"]["post"]["responses"]["400"]["content"]["application/json"]["schema"]
+    assert schema_a is not schema_b
+
+
+def test_mutating_generated_schema_does_not_alter_module_constant() -> None:
+    schema = {"paths": {"/items": {"post": _operation_with_422()}}}
+    result = patch_422_responses(schema, "400")
+
+    result["paths"]["/items"]["post"]["responses"]["400"]["content"]["application/json"]["schema"]["x-note"] = "touched"
+
+    assert "x-note" not in overrider_module._VALIDATION_ERROR_REF
+
+
+def test_independent_apps_do_not_share_component_schemas() -> None:
+    def build_app() -> FastAPI:
+        app = FastAPI()
+
+        @app.post("/items")
+        async def create_item(item: Item) -> dict[str, Any]: ...
+
+        override_validation_error(app)
+        return app
+
+    app1 = build_app()
+    app2 = build_app()
+
+    schema1 = app1.openapi()
+    schema1["components"]["schemas"]["ValidationError"]["x-note"] = "touched by app1"
+
+    schema2 = app2.openapi()
+
+    assert "x-note" not in schema2["components"]["schemas"]["ValidationError"]
+    assert "x-note" not in fastapi_openapi_utils.validation_error_definition
