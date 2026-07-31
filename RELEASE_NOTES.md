@@ -6,6 +6,10 @@
 
 * ✨ Extend validation error patching to webhooks and callbacks. PR [#35](https://github.com/mat81black/fastapi-validation-override/pull/35) by [@mat81black](https://github.com/mat81black).
 
+### Fixes
+
+* 🐛 Fix shared mutable schema objects leaking mutations across routes and apps. PR [#36](https://github.com/mat81black/fastapi-validation-override/pull/36) by [@mat81black](https://github.com/mat81black).
+
 ## 1.0.0 (2026-07-28)
 
 🎉 First stable release of fastapi-validation-override.
