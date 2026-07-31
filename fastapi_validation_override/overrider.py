@@ -2,11 +2,12 @@ from collections.abc import Iterator
 from copy import deepcopy
 from typing import Any
 
+import fastapi.openapi.utils as fastapi_openapi_utils
+
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.constants import REF_PREFIX
-from fastapi.openapi.utils import validation_error_definition, validation_error_response_definition
 from fastapi.responses import JSONResponse
 
 _HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
@@ -68,6 +69,9 @@ def _resolve_validation_ref(schema: dict[str, Any]) -> tuple[dict[str, str], str
     HTTPValidationError component and the name it was inserted under.
     """
     components = schema.setdefault("components", {}).setdefault("schemas", {})
+
+    validation_error_definition = fastapi_openapi_utils.validation_error_definition
+    validation_error_response_definition = fastapi_openapi_utils.validation_error_response_definition
 
     validation_error_name = "ValidationError"
     existing_ve = components.get(validation_error_name)
