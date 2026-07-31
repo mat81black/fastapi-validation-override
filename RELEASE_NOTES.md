@@ -8,6 +8,7 @@
 
 ### Fixes
 
+* 🐛 Fix invalid OpenAPI produced when merging into a $ref target response. PR [#40](https://github.com/mat81black/fastapi-validation-override/pull/40) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix user-defined schemas being silently overwritten by validation error definitions. PR [#39](https://github.com/mat81black/fastapi-validation-override/pull/39) by [@mat81black](https://github.com/mat81black).
 * 🐛 Base validation detection on FastAPI's 422 signal instead of schema shape alone. PR [#38](https://github.com/mat81black/fastapi-validation-override/pull/38) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix custom 422 models with a name ending in HTTPValidationError being silently deleted. PR [#37](https://github.com/mat81black/fastapi-validation-override/pull/37) by [@mat81black](https://github.com/mat81black).
