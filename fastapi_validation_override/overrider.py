@@ -51,12 +51,34 @@ def _iter_operations(schema: dict[str, Any]) -> Iterator[dict[str, Any]]:
                             yield from _iter_operations({"paths": callback_paths})
 
 
-def _ensure_validation_components(schema: dict[str, Any]) -> None:
+def _resolve_validation_ref(schema: dict[str, Any]) -> tuple[dict[str, str], str]:
+    """
+    Ensure ValidationError/HTTPValidationError components exist in `schema`, picking an alternate
+    name for either one the schema already declares for something else. Returns a $ref to the
+    HTTPValidationError component and the name it was inserted under.
+    """
     components = schema.setdefault("components", {}).setdefault("schemas", {})
-    if "ValidationError" not in components:
-        components["ValidationError"] = deepcopy(validation_error_definition)
-    if "HTTPValidationError" not in components:
-        components["HTTPValidationError"] = deepcopy(validation_error_response_definition)
+
+    validation_error_name = "ValidationError"
+    existing_ve = components.get(validation_error_name)
+    if existing_ve is not None and existing_ve != validation_error_definition:
+        validation_error_name = "FastAPIValidationOverride_ValidationError"
+
+    http_validation_error_def: dict[str, Any] = deepcopy(validation_error_response_definition)
+    if validation_error_name != "ValidationError":
+        http_validation_error_def["properties"]["detail"]["items"]["$ref"] = f"{REF_PREFIX}{validation_error_name}"
+
+    http_validation_error_name = "HTTPValidationError"
+    existing_http_validation_error = components.get(http_validation_error_name)
+    if existing_http_validation_error is not None and existing_http_validation_error != http_validation_error_def:
+        http_validation_error_name = "FastAPIValidationOverride_HTTPValidationError"
+
+    if validation_error_name not in components:
+        components[validation_error_name] = deepcopy(validation_error_definition)
+    if http_validation_error_name not in components:
+        components[http_validation_error_name] = http_validation_error_def
+
+    return _validation_error_ref(http_validation_error_name), http_validation_error_name
 
 
 def patch_422_responses(
@@ -78,7 +100,7 @@ def patch_422_responses(
         is merged with the validation error schema using `anyOf`. If False, it is left untouched.
     :return: The same `schema` dict, mutated in place.
     """
-    components_ensured = False
+    validation: tuple[dict[str, str], str] | None = None
 
     for operation in _iter_operations(schema):
         responses = operation.setdefault("responses", {})
@@ -94,6 +116,10 @@ def patch_422_responses(
         if not (removed_fastapi_422 or _operation_needs_validation(operation)):
             continue
 
+        if validation is None:
+            validation = _resolve_validation_ref(schema)
+        validation_ref, validation_ref_name = validation
+
         if target_code in responses:
             if not merge_target_response:
                 continue
@@ -103,12 +129,12 @@ def patch_422_responses(
             existing_schema = existing_content.setdefault("schema", {})
 
             if "anyOf" in existing_schema:
-                if _VALIDATION_ERROR_REF not in existing_schema["anyOf"]:
-                    existing_schema["anyOf"].insert(0, _validation_error_ref())
-            elif existing_schema and existing_schema != _VALIDATION_ERROR_REF:
-                existing_content["schema"] = {"anyOf": [_validation_error_ref(), existing_schema]}
+                if validation_ref not in existing_schema["anyOf"]:
+                    existing_schema["anyOf"].insert(0, _validation_error_ref(validation_ref_name))
+            elif existing_schema and existing_schema != validation_ref:
+                existing_content["schema"] = {"anyOf": [_validation_error_ref(validation_ref_name), existing_schema]}
             elif not existing_schema:
-                existing_content["schema"] = _validation_error_ref()
+                existing_content["schema"] = _validation_error_ref(validation_ref_name)
 
             old_desc = existing_response.get("description", "Error")
             if "Validation Error" not in old_desc:
@@ -116,12 +142,8 @@ def patch_422_responses(
         else:
             responses[target_code] = {
                 "description": "Validation Error",
-                "content": {"application/json": {"schema": _validation_error_ref()}},
+                "content": {"application/json": {"schema": _validation_error_ref(validation_ref_name)}},
             }
-
-        if not components_ensured:
-            _ensure_validation_components(schema)
-            components_ensured = True
 
     return schema
 
