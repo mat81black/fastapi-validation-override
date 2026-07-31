@@ -814,6 +814,67 @@ def test_patch_422_merge_target_response_false_still_synthesizes_when_target_abs
     assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
 
 
+def test_patch_422_target_as_local_response_ref_merges_on_inlined_copy() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(**{"400": {"$ref": "#/components/responses/Foo"}}),
+            }
+        },
+        "components": {
+            "responses": {
+                "Foo": {
+                    "description": "Out of stock",
+                    "content": {
+                        "application/json": {"schema": {"$ref": "#/components/schemas/OutOfStockError"}},
+                    },
+                }
+            }
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
+    assert "$ref" not in response_400
+    content_schema = response_400["content"]["application/json"]["schema"]
+    assert "anyOf" in content_schema
+    assert len(content_schema["anyOf"]) == 2
+    # the shared component itself must stay untouched by the merge
+    shared_foo = result["components"]["responses"]["Foo"]
+    assert shared_foo["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/OutOfStockError"}
+
+
+def test_patch_422_target_as_external_response_ref_is_left_untouched() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(**{"400": {"$ref": "external.yaml#/components/responses/Foo"}}),
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
+    assert response_400 == {"$ref": "external.yaml#/components/responses/Foo"}
+
+
+def test_patch_422_target_as_unresolvable_local_response_ref_is_left_untouched() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(**{"400": {"$ref": "#/components/responses/Missing"}}),
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
+    assert response_400 == {"$ref": "#/components/responses/Missing"}
+
+
 # ── patch_422_responses: idempotenza su schema già patchato ─────────────────
 
 

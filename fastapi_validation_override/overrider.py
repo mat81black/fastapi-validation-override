@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 _HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 _VALIDATION_ERROR_REF = {"$ref": f"{REF_PREFIX}HTTPValidationError"}
+_LOCAL_RESPONSE_REF_PREFIX = "#/components/responses/"
 
 
 def _validation_error_ref(name: str = "HTTPValidationError") -> dict[str, str]:
@@ -49,6 +50,15 @@ def _iter_operations(schema: dict[str, Any]) -> Iterator[dict[str, Any]]:
                     for callback_paths in callbacks.values():
                         if isinstance(callback_paths, dict):
                             yield from _iter_operations({"paths": callback_paths})
+
+
+def _resolve_local_response(schema: dict[str, Any], ref: str) -> dict[str, Any] | None:
+    """Resolve a local (in-document) $ref to a Response Object, or None if it can't be resolved."""
+    if not ref.startswith(_LOCAL_RESPONSE_REF_PREFIX):
+        return None
+    name = ref[len(_LOCAL_RESPONSE_REF_PREFIX) :]
+    response = schema.get("components", {}).get("responses", {}).get(name)
+    return response if isinstance(response, dict) else None
 
 
 def _resolve_validation_ref(schema: dict[str, Any]) -> tuple[dict[str, str], str]:
@@ -98,6 +108,9 @@ def patch_422_responses(
     :param target_code: The status code to document the validation error at, e.g. `"400"`.
     :param merge_target_response: If True (default), a response already declared at `target_code`
         is merged with the validation error schema using `anyOf`. If False, it is left untouched.
+        If that response is a local `$ref` to `#/components/responses/...`, the merge happens on
+        an inlined copy, leaving the shared component untouched; an external or unresolvable
+        `$ref` is left as-is.
     :return: The same `schema` dict, mutated in place.
     """
     validation: tuple[dict[str, str], str] | None = None
@@ -125,6 +138,13 @@ def patch_422_responses(
                 continue
 
             existing_response = responses[target_code]
+            if "$ref" in existing_response:
+                resolved = _resolve_local_response(schema, existing_response["$ref"])
+                if resolved is None:
+                    continue
+                existing_response = deepcopy(resolved)
+                responses[target_code] = existing_response
+
             existing_content = existing_response.setdefault("content", {}).setdefault("application/json", {})
             existing_schema = existing_content.setdefault("schema", {})
 
