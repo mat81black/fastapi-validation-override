@@ -3,6 +3,7 @@ from typing import Any
 import fastapi.openapi.utils as fastapi_openapi_utils
 
 from fastapi import FastAPI, status
+from fastapi.openapi.constants import REF_PREFIX
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel
 
@@ -629,6 +630,32 @@ def test_patch_422_custom_422_left_untouched_and_target_still_synthesized() -> N
     assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
 
 
+def test_patch_422_model_named_like_http_validation_error_is_not_mistaken_for_it() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "422": {
+                            "description": "Domain-specific error, unrelated to validation",
+                            "content": {
+                                "application/json": {"schema": {"$ref": "#/components/schemas/MyHTTPValidationError"}}
+                            },
+                        }
+                    },
+                    "requestBody": _REQUEST_BODY,
+                }
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    responses = result["paths"]["/items"]["post"]["responses"]
+    assert responses["422"]["content"]["application/json"]["schema"]["$ref"].endswith("MyHTTPValidationError")
+    assert responses["400"]["content"]["application/json"]["schema"]["$ref"] == f"{REF_PREFIX}HTTPValidationError"
+
+
 # ── patch_422_responses: merge_target_response=False ─────────────────────────
 
 
@@ -745,6 +772,25 @@ async def test_custom_422_left_untouched_and_target_synthesized_end_to_end() -> 
     assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
     assert "HTTPValidationError" in schema["components"]["schemas"]
     assert "ValidationError" in schema["components"]["schemas"]
+
+
+async def test_model_named_like_http_validation_error_is_not_mistaken_for_it_end_to_end() -> None:
+    app = FastAPI()
+
+    class MyHTTPValidationError(BaseModel):  # pragma: no cover
+        error_code: str
+
+    @app.post("/items", responses={422: {"model": MyHTTPValidationError, "description": "My own 422"}})
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+
+    async with _client(app) as client:
+        schema = (await client.get("/openapi.json")).json()
+
+    responses = schema["paths"]["/items"]["post"]["responses"]
+    assert responses["422"]["content"]["application/json"]["schema"]["$ref"].endswith("MyHTTPValidationError")
+    assert responses["400"]["content"]["application/json"]["schema"]["$ref"] == f"{REF_PREFIX}HTTPValidationError"
 
 
 async def test_custom_422_left_untouched_runtime_still_returns_target_code() -> None:

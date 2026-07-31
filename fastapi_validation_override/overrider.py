@@ -88,9 +88,8 @@ def patch_422_responses(
 
         response_422 = responses.get("422")
         if response_422 is not None:
-            content_422 = response_422.get("content", {}).get("application/json", {})
-            ref = content_422.get("schema", {}).get("$ref", "")
-            if ref.endswith("HTTPValidationError"):
+            schema_422 = response_422.get("content", {}).get("application/json", {}).get("schema", {})
+            if schema_422 == _VALIDATION_ERROR_REF:
                 del responses["422"]
 
         if not _operation_needs_validation(operation):
