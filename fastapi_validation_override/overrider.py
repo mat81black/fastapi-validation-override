@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -15,6 +16,35 @@ def _operation_needs_validation(operation: dict[str, Any]) -> bool:
     return bool(operation.get("requestBody")) or bool(operation.get("parameters"))
 
 
+def _iter_path_item_operations(path_item: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    for method, operation in path_item.items():
+        if method not in _HTTP_METHODS or not isinstance(operation, dict):
+            # path_item may hold non-operation keys (summary, parameters, ...) or itself be a $ref
+            continue
+        yield operation
+
+
+def _iter_operations(schema: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    """Yield every Operation Object in the schema: paths, webhooks, and callbacks, recursively."""
+    for container_key in ("paths", "webhooks"):
+        container = schema.get(container_key)
+        if not isinstance(container, dict):
+            continue
+
+        for path_item in container.values():
+            if not isinstance(path_item, dict):
+                continue
+
+            for operation in _iter_path_item_operations(path_item):
+                yield operation
+
+                callbacks = operation.get("callbacks")
+                if isinstance(callbacks, dict):
+                    for callback_paths in callbacks.values():
+                        if isinstance(callback_paths, dict):
+                            yield from _iter_operations({"paths": callback_paths})
+
+
 def _ensure_validation_components(schema: dict[str, Any]) -> None:
     components = schema.setdefault("components", {}).setdefault("schemas", {})
     components.setdefault("ValidationError", validation_error_definition)
@@ -26,6 +56,9 @@ def patch_422_responses(
 ) -> dict[str, Any]:
     """
     Ensure every operation that can raise a validation error documents it at `target_code` instead of 422.
+
+    Every operation in `schema["paths"]`, `schema["webhooks"]`, and any `callbacks` declared on an
+    operation (recursively) is patched consistently.
 
     What happens to 422 and what happens to `target_code` are decided independently:
 
@@ -42,52 +75,47 @@ def patch_422_responses(
     """
     components_ensured = False
 
-    for _path, path_item in schema.get("paths", {}).items():
-        for _method, operation in path_item.items():
-            if _method not in _HTTP_METHODS:
-                # path_item may contain non-operation keys: summary, description, servers, parameters
+    for operation in _iter_operations(schema):
+        responses = operation.setdefault("responses", {})
+
+        response_422 = responses.get("422")
+        if response_422 is not None:
+            content_422 = response_422.get("content", {}).get("application/json", {})
+            ref = content_422.get("schema", {}).get("$ref", "")
+            if ref.endswith("HTTPValidationError"):
+                del responses["422"]
+
+        if not _operation_needs_validation(operation):
+            continue
+
+        if target_code in responses:
+            if not merge_target_response:
                 continue
 
-            responses = operation.setdefault("responses", {})
+            existing_response = responses[target_code]
+            existing_content = existing_response.setdefault("content", {}).setdefault("application/json", {})
+            existing_schema = existing_content.setdefault("schema", {})
 
-            response_422 = responses.get("422")
-            if response_422 is not None:
-                content_422 = response_422.get("content", {}).get("application/json", {})
-                ref = content_422.get("schema", {}).get("$ref", "")
-                if ref.endswith("HTTPValidationError"):
-                    del responses["422"]
+            if "anyOf" in existing_schema:
+                if _VALIDATION_ERROR_REF not in existing_schema["anyOf"]:
+                    existing_schema["anyOf"].insert(0, _VALIDATION_ERROR_REF)
+            elif existing_schema and existing_schema != _VALIDATION_ERROR_REF:
+                existing_content["schema"] = {"anyOf": [_VALIDATION_ERROR_REF, existing_schema]}
+            elif not existing_schema:
+                existing_content["schema"] = _VALIDATION_ERROR_REF
 
-            if not _operation_needs_validation(operation):
-                continue
+            old_desc = existing_response.get("description", "Error")
+            if "Validation Error" not in old_desc:
+                existing_response["description"] = f"{old_desc} / Validation Error"
+        else:
+            responses[target_code] = {
+                "description": "Validation Error",
+                "content": {"application/json": {"schema": _VALIDATION_ERROR_REF}},
+            }
 
-            if target_code in responses:
-                if not merge_target_response:
-                    continue
-
-                existing_response = responses[target_code]
-                existing_content = existing_response.setdefault("content", {}).setdefault("application/json", {})
-                existing_schema = existing_content.setdefault("schema", {})
-
-                if "anyOf" in existing_schema:
-                    if _VALIDATION_ERROR_REF not in existing_schema["anyOf"]:
-                        existing_schema["anyOf"].insert(0, _VALIDATION_ERROR_REF)
-                elif existing_schema and existing_schema != _VALIDATION_ERROR_REF:
-                    existing_content["schema"] = {"anyOf": [_VALIDATION_ERROR_REF, existing_schema]}
-                elif not existing_schema:
-                    existing_content["schema"] = _VALIDATION_ERROR_REF
-
-                old_desc = existing_response.get("description", "Error")
-                if "Validation Error" not in old_desc:
-                    existing_response["description"] = f"{old_desc} / Validation Error"
-            else:
-                responses[target_code] = {
-                    "description": "Validation Error",
-                    "content": {"application/json": {"schema": _VALIDATION_ERROR_REF}},
-                }
-
-            if not components_ensured:
-                _ensure_validation_components(schema)
-                components_ensured = True
+        if not components_ensured:
+            _ensure_validation_components(schema)
+            components_ensured = True
 
     return schema
 
