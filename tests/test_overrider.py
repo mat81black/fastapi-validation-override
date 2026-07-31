@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Any
 
 import fastapi.openapi.utils as fastapi_openapi_utils
@@ -704,6 +705,62 @@ def test_patch_422_model_named_like_http_validation_error_is_not_mistaken_for_it
     assert responses["400"]["content"]["application/json"]["schema"]["$ref"] == f"{REF_PREFIX}HTTPValidationError"
 
 
+def test_resolve_validation_ref_no_collision_uses_standard_names() -> None:
+    schema: dict[str, Any] = {}
+
+    ref, name = overrider_module._resolve_validation_ref(schema)
+
+    assert name == "HTTPValidationError"
+    assert ref == {"$ref": f"{REF_PREFIX}HTTPValidationError"}
+    schemas = schema["components"]["schemas"]
+    assert schemas["ValidationError"] == fastapi_openapi_utils.validation_error_definition
+    assert schemas["HTTPValidationError"] == fastapi_openapi_utils.validation_error_response_definition
+
+
+def test_resolve_validation_ref_reuses_existing_matching_components() -> None:
+    schema = {
+        "components": {
+            "schemas": {
+                "ValidationError": deepcopy(fastapi_openapi_utils.validation_error_definition),
+                "HTTPValidationError": deepcopy(fastapi_openapi_utils.validation_error_response_definition),
+            }
+        }
+    }
+
+    ref, name = overrider_module._resolve_validation_ref(schema)
+
+    assert name == "HTTPValidationError"
+    assert ref == {"$ref": f"{REF_PREFIX}HTTPValidationError"}
+
+
+def test_resolve_validation_ref_rewrites_nested_ref_on_validation_error_collision() -> None:
+    schema = {"components": {"schemas": {"ValidationError": {"type": "string"}}}}
+
+    ref, name = overrider_module._resolve_validation_ref(schema)
+
+    # HTTPValidationError itself has no collision here, so it keeps the standard name...
+    assert name == "HTTPValidationError"
+    assert ref == {"$ref": f"{REF_PREFIX}HTTPValidationError"}
+    schemas = schema["components"]["schemas"]
+    assert schemas["ValidationError"] == {"type": "string"}
+    assert schemas["FastAPIValidationOverride_ValidationError"] == fastapi_openapi_utils.validation_error_definition
+    # ...but its nested $ref to ValidationError must point at the renamed component instead.
+    nested_ref = schemas["HTTPValidationError"]["properties"]["detail"]["items"]["$ref"]
+    assert nested_ref == f"{REF_PREFIX}FastAPIValidationOverride_ValidationError"
+
+
+def test_resolve_validation_ref_renames_only_http_validation_error_on_its_own_collision() -> None:
+    schema = {"components": {"schemas": {"HTTPValidationError": {"type": "string"}}}}
+
+    ref, name = overrider_module._resolve_validation_ref(schema)
+
+    assert name == "FastAPIValidationOverride_HTTPValidationError"
+    assert ref == {"$ref": f"{REF_PREFIX}FastAPIValidationOverride_HTTPValidationError"}
+    schemas = schema["components"]["schemas"]
+    assert schemas["HTTPValidationError"] == {"type": "string"}
+    assert schemas["ValidationError"] == fastapi_openapi_utils.validation_error_definition
+
+
 # ── patch_422_responses: merge_target_response=False ─────────────────────────
 
 
@@ -839,6 +896,42 @@ async def test_model_named_like_http_validation_error_is_not_mistaken_for_it_end
     responses = schema["paths"]["/items"]["post"]["responses"]
     assert responses["422"]["content"]["application/json"]["schema"]["$ref"].endswith("MyHTTPValidationError")
     assert responses["400"]["content"]["application/json"]["schema"]["$ref"] == f"{REF_PREFIX}HTTPValidationError"
+
+
+async def test_unrelated_model_literally_named_http_validation_error_survives_end_to_end() -> None:
+    """
+    Regression scenario: a model with the exact same name as FastAPI's own component is used
+    elsewhere in the app, on a route that never triggers validation itself. Since no other route
+    triggers FastAPI's own native HTTPValidationError either (this route occupies its own 422),
+    the unrelated model keeps that component name until we need it — and must not be clobbered.
+    """
+    app = FastAPI()
+
+    class HTTPValidationError(BaseModel):  # pragma: no cover
+        my_own_field: str
+
+    class MyDomainError(BaseModel):  # pragma: no cover
+        error_code: str
+
+    @app.get("/unrelated", response_model=HTTPValidationError)
+    async def unrelated() -> HTTPValidationError: ...
+
+    @app.post("/items", responses={422: {"model": MyDomainError, "description": "My own 422"}})
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+
+    async with _client(app) as client:
+        schema = (await client.get("/openapi.json")).json()
+
+    schemas = schema["components"]["schemas"]
+    assert schemas["HTTPValidationError"]["properties"] == {"my_own_field": {"type": "string", "title": "My Own Field"}}
+    assert "FastAPIValidationOverride_HTTPValidationError" in schemas
+
+    response_400 = schema["paths"]["/items"]["post"]["responses"]["400"]
+    assert response_400["content"]["application/json"]["schema"]["$ref"] == (
+        f"{REF_PREFIX}FastAPIValidationOverride_HTTPValidationError"
+    )
 
 
 async def test_custom_422_left_untouched_runtime_still_returns_target_code() -> None:
