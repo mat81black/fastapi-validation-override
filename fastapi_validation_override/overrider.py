@@ -63,36 +63,35 @@ def patch_422_responses(
     schema: dict[str, Any], target_code: str, *, merge_target_response: bool = True
 ) -> dict[str, Any]:
     """
-    Ensure every operation that can raise a validation error documents it at `target_code` instead of 422.
+    Move FastAPI's 422 validation error response to `target_code`, across paths, webhooks, and
+    callbacks (recursively, for callbacks declared on any operation).
 
-    Every operation in `schema["paths"]`, `schema["webhooks"]`, and any `callbacks` declared on an
-    operation (recursively) is patched consistently.
+    A parameter declared with `include_in_schema=False` still triggers validation at runtime, but
+    is invisible in the generated schema. If such a route also already occupies 422, `4XX`, or
+    `default` with something else, FastAPI never emits its own 422 response for that operation —
+    the only signal this function relies on to detect the need for validation on such a parameter.
+    In that specific combination, `target_code` won't be documented.
 
-    What happens to 422 and what happens to `target_code` are decided independently:
-
-    - If an operation has a FastAPI-generated 422 validation response, it is removed. Any other
-      response already declared at 422 (unrelated to validation) is left untouched.
-    - If the operation needs request validation (it declares a body or parameters) and
-      `target_code` doesn't already document the validation schema, it is added there,
-      synthesizing it from FastAPI's own component definitions if necessary. When `target_code`
-      already has a response declared, `merge_target_response` controls the outcome: if True,
-      the validation schema is merged into it using `anyOf`; if False, the existing response is
-      left untouched, mirroring how FastAPI itself treats a response you already declared at 422.
-
-    Mutates `schema` in place and returns it.
+    :param schema: An OpenAPI schema dict, such as one returned by `app.openapi()`.
+    :param target_code: The status code to document the validation error at, e.g. `"400"`.
+    :param merge_target_response: If True (default), a response already declared at `target_code`
+        is merged with the validation error schema using `anyOf`. If False, it is left untouched.
+    :return: The same `schema` dict, mutated in place.
     """
     components_ensured = False
 
     for operation in _iter_operations(schema):
         responses = operation.setdefault("responses", {})
 
+        removed_fastapi_422 = False
         response_422 = responses.get("422")
         if response_422 is not None:
             schema_422 = response_422.get("content", {}).get("application/json", {}).get("schema", {})
             if schema_422 == _VALIDATION_ERROR_REF:
                 del responses["422"]
+                removed_fastapi_422 = True
 
-        if not _operation_needs_validation(operation):
+        if not (removed_fastapi_422 or _operation_needs_validation(operation)):
             continue
 
         if target_code in responses:
@@ -147,6 +146,7 @@ def override_validation_error(
     :param merge_target_response: If True (default), a response you already declared at
         `status_code` is merged with the validation error schema using `anyOf`. If False,
         it is left untouched.
+    :return: None. `app` is patched in place.
     """
     if status_code == 422:
         return

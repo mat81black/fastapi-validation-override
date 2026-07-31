@@ -378,6 +378,29 @@ async def test_invalid_query_param_returns_target_status_code() -> None:
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
+async def test_hidden_query_param_still_documents_and_returns_target_code() -> None:
+    from typing import Annotated
+
+    from fastapi import Query
+
+    app = FastAPI()
+
+    @app.get("/hidden")
+    async def hidden(secret: Annotated[int, Query(include_in_schema=False)]) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+
+    async with _client(app) as client:
+        schema = (await client.get("/openapi.json")).json()
+        response = await client.get("/hidden", params={"secret": "not-a-number"})
+
+    operation = schema["paths"]["/hidden"]["get"]
+    assert "parameters" not in operation
+    assert "422" not in operation["responses"]
+    assert "400" in operation["responses"]
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
 # ── schema: path con metodi multipli ─────────────────────────────────────────
 
 
@@ -604,6 +627,31 @@ def test_patch_422_no_synthesis_when_operation_does_not_need_validation() -> Non
 
     assert "components" not in result
     assert result["paths"]["/items"]["get"]["responses"] == {}
+
+
+def test_patch_422_detects_validation_via_removed_422_even_without_params_in_schema() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "get": {
+                    "responses": {
+                        "422": {
+                            "description": "Validation Error",
+                            "content": {
+                                "application/json": {"schema": {"$ref": f"{REF_PREFIX}HTTPValidationError"}},
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    responses = result["paths"]["/items"]["get"]["responses"]
+    assert "422" not in responses
+    assert "400" in responses
 
 
 def test_patch_422_custom_422_left_untouched_and_target_still_synthesized() -> None:
