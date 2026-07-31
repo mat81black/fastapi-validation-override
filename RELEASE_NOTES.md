@@ -8,6 +8,7 @@
 
 ### Fixes
 
+* 🐛 Base validation detection on FastAPI's 422 signal instead of schema shape alone. PR [#38](https://github.com/mat81black/fastapi-validation-override/pull/38) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix custom 422 models with a name ending in HTTPValidationError being silently deleted. PR [#37](https://github.com/mat81black/fastapi-validation-override/pull/37) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix shared mutable schema objects leaking mutations across routes and apps. PR [#36](https://github.com/mat81black/fastapi-validation-override/pull/36) by [@mat81black](https://github.com/mat81black).
 
