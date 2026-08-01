@@ -18,6 +18,7 @@
 
 ### Refactors
 
+* ♻️ Refactor local $ref resolution to support reusable components across multiple sections. PR [#46](https://github.com/mat81black/fastapi-validation-override/pull/46) by [@mat81black](https://github.com/mat81black).
 * ♻️ Read FastAPI's validation error definitions dynamically instead of at import time. PR [#41](https://github.com/mat81black/fastapi-validation-override/pull/41) by [@mat81black](https://github.com/mat81black).
 
 ### Docs
