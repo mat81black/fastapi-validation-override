@@ -164,7 +164,7 @@ fastapi_openapi_utils.validation_error_response_definition = {
 override_validation_error(app)  # must come after, same ordering rule as a custom app.openapi
 ```
 
-If a route already has its own response at the target code and its schema collides with `ValidationError`/`HTTPValidationError` by name, the library detects it and inserts its own copy under an alternate, namespaced name instead of overwriting yours — this works no matter how the definition above is shaped.
+If your schema already declares a component named `ValidationError` or `HTTPValidationError` for something else — anywhere in the app, not just on a route that needs validation — the library detects the collision and inserts its own copy under an alternate, namespaced name instead of overwriting yours. This works no matter how the definition above is shaped.
 
 **This only changes the documented schema, not the runtime response body.** The built-in exception handler always returns `{"detail": [...]}` regardless of any reassignment above. To align the two, set `handle_exceptions=False` and provide your own handler matching the custom shape, as shown in [Custom exception handler](#custom-exception-handler).
 
