@@ -25,6 +25,10 @@
 
 * 📝 Clarify idempotency behavior in README. PR [#43](https://github.com/mat81black/fastapi-validation-override/pull/43) by [@mat81black](https://github.com/mat81black).
 
+### Internal
+
+* ✅ Cover webhooks and callbacks with a runnable example. PR [#47](https://github.com/mat81black/fastapi-validation-override/pull/47) by [@mat81black](https://github.com/mat81black).
+
 ## 1.0.0 (2026-07-28)
 
 🎉 First stable release of fastapi-validation-override.
