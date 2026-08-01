@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 1.1.0 (2026-08-01)
+
 ### Features
 
 * ✨ Support custom validation error schemas with any field structure. PR [#44](https://github.com/mat81black/fastapi-validation-override/pull/44) by [@mat81black](https://github.com/mat81black).
