@@ -1019,6 +1019,80 @@ def test_patch_422_target_as_unresolvable_local_response_ref_is_left_untouched()
     assert response_400 == {"$ref": "#/components/responses/Missing"}
 
 
+def test_patch_422_target_as_chained_local_response_ref_merges_on_inlined_copy() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(**{"400": {"$ref": "#/components/responses/Foo"}}),
+            }
+        },
+        "components": {
+            "responses": {
+                "Foo": {"$ref": "#/components/responses/Bar"},
+                "Bar": {
+                    "description": "Out of stock",
+                    "content": {
+                        "application/json": {"schema": {"$ref": "#/components/schemas/OutOfStockError"}},
+                    },
+                },
+            }
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
+    assert "$ref" not in response_400
+    content_schema = response_400["content"]["application/json"]["schema"]
+    assert "anyOf" in content_schema
+    assert len(content_schema["anyOf"]) == 2
+    # the shared components must stay untouched by the merge
+    assert result["components"]["responses"]["Foo"] == {"$ref": "#/components/responses/Bar"}
+    shared_bar = result["components"]["responses"]["Bar"]
+    assert shared_bar["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/OutOfStockError"}
+
+
+def test_patch_422_target_as_cyclic_local_response_ref_is_left_untouched() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(**{"400": {"$ref": "#/components/responses/Foo"}}),
+            }
+        },
+        "components": {
+            "responses": {
+                "Foo": {"$ref": "#/components/responses/Bar"},
+                "Bar": {"$ref": "#/components/responses/Foo"},
+            }
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
+    assert response_400 == {"$ref": "#/components/responses/Foo"}
+
+
+def test_patch_422_target_as_local_response_ref_chained_to_external_is_left_untouched() -> None:
+    schema = {
+        "paths": {
+            "/items": {
+                "post": _operation_with_422(**{"400": {"$ref": "#/components/responses/Foo"}}),
+            }
+        },
+        "components": {
+            "responses": {
+                "Foo": {"$ref": "external.yaml#/components/responses/Bar"},
+            }
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
+    assert response_400 == {"$ref": "#/components/responses/Foo"}
+
+
 # ── patch_422_responses: idempotenza su schema già patchato ─────────────────
 
 

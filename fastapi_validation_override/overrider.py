@@ -54,12 +54,26 @@ def _iter_operations(schema: dict[str, Any]) -> Iterator[dict[str, Any]]:
 
 
 def _resolve_local_response(schema: dict[str, Any], ref: str) -> dict[str, Any] | None:
-    """Resolve a local (in-document) $ref to a Response Object, or None if it can't be resolved."""
-    if not ref.startswith(_LOCAL_RESPONSE_REF_PREFIX):
-        return None
-    name = ref[len(_LOCAL_RESPONSE_REF_PREFIX) :]
-    response = schema.get("components", {}).get("responses", {}).get(name)
-    return response if isinstance(response, dict) else None
+    """
+    Resolve a local (in-document) $ref to a Response Object, following chained $refs until a
+    terminal (non-$ref) object is reached. Returns None if a step in the chain is external,
+    unresolvable, or the chain cycles back on itself.
+    """
+    visited_refs: set[str] = set()
+    while True:
+        if not ref.startswith(_LOCAL_RESPONSE_REF_PREFIX) or ref in visited_refs:
+            return None
+        visited_refs.add(ref)
+
+        name = ref[len(_LOCAL_RESPONSE_REF_PREFIX) :]
+        response = schema.get("components", {}).get("responses", {}).get(name)
+        if not isinstance(response, dict):
+            return None
+
+        next_ref = response.get("$ref")
+        if next_ref is None:
+            return response
+        ref = next_ref
 
 
 def _replace_ref(value: Any, old_ref: str, new_ref: str) -> None:
@@ -124,9 +138,10 @@ def patch_422_responses(
     :param target_code: The status code to document the validation error at, e.g. `"400"`.
     :param merge_target_response: If True (default), a response already declared at `target_code`
         is merged with the validation error schema using `anyOf`. If False, it is left untouched.
-        If that response is a local `$ref` to `#/components/responses/...`, the merge happens on
-        an inlined copy, leaving the shared component untouched; an external or unresolvable
-        `$ref` is left as-is.
+        If that response is a local `$ref` to `#/components/responses/...`, chained refs are
+        followed to the terminal Response Object and the merge happens on an inlined copy,
+        leaving the shared components untouched; an external, unresolvable, or cyclic `$ref`
+        is left as-is.
     :return: The same `schema` dict, mutated in place.
     """
     validation: tuple[dict[str, str], str] | None = None

@@ -217,6 +217,8 @@ override_validation_error(app)
 
 The merge only touches the `schema` (the JSON Schema union). It doesn't generate an OpenAPI `example`/`examples` value for either variant, so tools like Swagger UI won't show a distinct sample payload for `OutOfStockError` versus the validation error unless you declare one yourself (e.g. via a field default, or `model_config = ConfigDict(json_schema_extra={"example": ...})`) — the library can't safely invent one for a model it knows nothing about.
 
+If the response you already declared at the target code is a local `$ref` to `#/components/responses/...`, chained refs are followed to the terminal Response Object and the merge happens on an inlined copy, leaving the shared components untouched. An external, unresolvable, or cyclic `$ref` is left as-is.
+
 Set `merge_target_response=False` to leave a response you already declared at the target code completely untouched instead of merging it with `anyOf`:
 
 ```python
