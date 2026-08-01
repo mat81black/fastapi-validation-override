@@ -62,6 +62,18 @@ def _resolve_local_response(schema: dict[str, Any], ref: str) -> dict[str, Any] 
     return response if isinstance(response, dict) else None
 
 
+def _replace_ref(value: Any, old_ref: str, new_ref: str) -> None:
+    """Recursively rewrite every $ref matching old_ref to new_ref, regardless of the envelope shape."""
+    if isinstance(value, dict):
+        if value.get("$ref") == old_ref:
+            value["$ref"] = new_ref
+        for child in value.values():
+            _replace_ref(child, old_ref, new_ref)
+    elif isinstance(value, list):
+        for child in value:
+            _replace_ref(child, old_ref, new_ref)
+
+
 def _resolve_validation_ref(schema: dict[str, Any]) -> tuple[dict[str, str], str]:
     """
     Ensure ValidationError/HTTPValidationError components exist in `schema`, picking an alternate
@@ -80,7 +92,7 @@ def _resolve_validation_ref(schema: dict[str, Any]) -> tuple[dict[str, str], str
 
     http_validation_error_def: dict[str, Any] = deepcopy(validation_error_response_definition)
     if validation_error_name != "ValidationError":
-        http_validation_error_def["properties"]["detail"]["items"]["$ref"] = f"{REF_PREFIX}{validation_error_name}"
+        _replace_ref(http_validation_error_def, f"{REF_PREFIX}ValidationError", f"{REF_PREFIX}{validation_error_name}")
 
     http_validation_error_name = "HTTPValidationError"
     existing_http_validation_error = components.get(http_validation_error_name)

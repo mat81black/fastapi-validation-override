@@ -790,6 +790,43 @@ def test_resolve_validation_ref_rewrites_nested_ref_on_validation_error_collisio
     assert nested_ref == f"{REF_PREFIX}FastAPIValidationOverride_ValidationError"
 
 
+def test_replace_ref_rewrites_ref_nested_inside_a_list() -> None:
+    value = {"anyOf": [{"$ref": f"{REF_PREFIX}ValidationError"}, {"type": "string"}]}
+
+    overrider_module._replace_ref(value, f"{REF_PREFIX}ValidationError", f"{REF_PREFIX}Renamed")
+
+    assert value == {"anyOf": [{"$ref": f"{REF_PREFIX}Renamed"}, {"type": "string"}]}
+
+
+def test_replace_ref_ignores_non_matching_refs() -> None:
+    value = {"$ref": f"{REF_PREFIX}SomethingElse"}
+
+    overrider_module._replace_ref(value, f"{REF_PREFIX}ValidationError", f"{REF_PREFIX}Renamed")
+
+    assert value == {"$ref": f"{REF_PREFIX}SomethingElse"}
+
+
+def test_resolve_validation_ref_rewrites_nested_ref_regardless_of_field_name() -> None:
+    """Reported bug: a custom definition using `dettagli` instead of `detail` raised KeyError
+    because the old code assumed the standard FastAPI envelope shape."""
+    original_http_validation_error = fastapi_openapi_utils.validation_error_response_definition
+    fastapi_openapi_utils.validation_error_response_definition = {
+        "title": "HTTPValidationError",
+        "type": "object",
+        "properties": {"dettagli": {"type": "array", "items": {"$ref": f"{REF_PREFIX}ValidationError"}}},
+    }
+    try:
+        schema = {"components": {"schemas": {"ValidationError": {"type": "string"}}}}
+        ref, name = overrider_module._resolve_validation_ref(schema)
+    finally:
+        fastapi_openapi_utils.validation_error_response_definition = original_http_validation_error
+
+    assert name == "HTTPValidationError"
+    nested_ref = schema["components"]["schemas"]["HTTPValidationError"]["properties"]["dettagli"]["items"]["$ref"]
+    assert nested_ref == f"{REF_PREFIX}FastAPIValidationOverride_ValidationError"
+    assert ref == {"$ref": f"{REF_PREFIX}HTTPValidationError"}
+
+
 def test_resolve_validation_ref_renames_only_http_validation_error_on_its_own_collision() -> None:
     schema = {"components": {"schemas": {"HTTPValidationError": {"type": "string"}}}}
 

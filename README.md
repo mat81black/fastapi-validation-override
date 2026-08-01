@@ -17,6 +17,7 @@ FastAPI returns 422 Unprocessable Entity for every request validation failure. M
 - **Independent of a custom 422**: if a route keeps its own, non-validation 422 response, it's left untouched and the validation schema is still documented at the target code
 - **Custom openapi preserved**: wraps any `app.openapi` function already installed and applies the patch on top of its output
 - **Bring your own handler**: `handle_exceptions=False` skips the built-in handler while still patching the schema
+- **Customizable validation schema**: honors `fastapi.openapi.utils.validation_error_definition`/`validation_error_response_definition` if you reassign them before patching (e.g. to match your own error envelope), regardless of field names or structure
 - **Idempotent**: safe to call multiple times on the same app instance. The first call configures the app; subsequent calls are ignored, even with different arguments — dynamic reconfiguration isn't supported
 - **No-op guard**: `status_code=422` leaves FastAPI behavior unchanged
 
@@ -134,6 +135,39 @@ async def create_item(item: Item) -> dict[str, object]:
 override_validation_error(app, status_code=400, handle_exceptions=False)
 ```
 
+### Customizing the validation error schema
+
+FastAPI itself defines the `ValidationError`/`HTTPValidationError` component schemas as two module-level dicts, `fastapi.openapi.utils.validation_error_definition` and `.validation_error_response_definition`. Reassign them **before** calling `override_validation_error` and the new shape is honored — this library reads them at call time, not at import time, and doesn't assume any particular field names or nesting. Useful, for example, to match an error envelope your other services already use:
+
+```python
+import fastapi.openapi.utils as fastapi_openapi_utils
+
+fastapi_openapi_utils.validation_error_definition = {
+    "title": "ValidationError",
+    "type": "object",
+    "properties": {
+        "field": {"type": "array", "items": {"type": "string"}},
+        "message": {"type": "string"},
+        "issue_type": {"type": "string"},
+    },
+}
+fastapi_openapi_utils.validation_error_response_definition = {
+    "title": "HTTPValidationError",
+    "type": "object",
+    "properties": {
+        "error_code": {"type": "string", "default": "VALIDATION_ERROR"},
+        "message": {"type": "string", "default": "One or more fields failed validation"},
+        "fields": {"type": "array", "items": {"$ref": "#/components/schemas/ValidationError"}},
+    },
+}
+
+override_validation_error(app)  # must come after, same ordering rule as a custom app.openapi
+```
+
+If a route already has its own response at the target code and its schema collides with `ValidationError`/`HTTPValidationError` by name, the library detects it and inserts its own copy under an alternate, namespaced name instead of overwriting yours — this works no matter how the definition above is shaped.
+
+**This only changes the documented schema, not the runtime response body.** The built-in exception handler always returns `{"detail": [...]}` regardless of any reassignment above. To align the two, set `handle_exceptions=False` and provide your own handler matching the custom shape, as shown in [Custom exception handler](#custom-exception-handler).
+
 ### Preserving a custom app.openapi
 
 Call `override_validation_error` **after** assigning your custom openapi function. The library captures `app.openapi` at call time and wraps it, so the order matters.
@@ -224,6 +258,7 @@ Runnable examples are in the [`examples/`](https://github.com/mat81black/fastapi
 | [`basic.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/basic.py) | Minimal setup with the default 400 status code |
 | [`custom_status_code.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/custom_status_code.py) | Using a custom status code (409) |
 | [`handle_exceptions_false.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/handle_exceptions_false.py) | Custom exception handler with schema-only patch |
+| [`custom_validation_schema.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/custom_validation_schema.py) | Replacing the validation error schema with a custom error envelope |
 | [`custom_openapi.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/custom_openapi.py) | Preserving a custom `app.openapi` function |
 | [`existing_response_at_target_code.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/existing_response_at_target_code.py) | `anyOf` merge when the target code is already declared |
 | [`custom_422_response.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/custom_422_response.py) | Keeping a custom, non-validation 422 response |
