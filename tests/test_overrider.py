@@ -2,6 +2,7 @@ from copy import deepcopy
 from typing import Any
 
 import fastapi.openapi.utils as fastapi_openapi_utils
+import pytest
 
 from fastapi import FastAPI, status
 from fastapi.openapi.constants import REF_PREFIX
@@ -360,6 +361,46 @@ async def test_guard_status_code_422_is_noop_schema() -> None:
 
     responses = schema["paths"]["/items"]["post"]["responses"]
     assert "422" in responses
+
+
+def test_status_code_true_is_rejected() -> None:
+    app = FastAPI()
+
+    with pytest.raises(TypeError, match="bool"):
+        override_validation_error(app, status_code=True)
+
+
+def test_status_code_false_is_rejected() -> None:
+    app = FastAPI()
+
+    with pytest.raises(TypeError, match="bool"):
+        override_validation_error(app, status_code=False)
+
+
+@pytest.mark.parametrize("status_code", [-1, 0, 99, 600, 999])
+def test_status_code_outside_valid_range_is_rejected(status_code: int) -> None:
+    app = FastAPI()
+
+    with pytest.raises(ValueError, match="100-599"):
+        override_validation_error(app, status_code=status_code)
+
+
+@pytest.mark.parametrize("status_code", [200, 400, 409, 422, 500, 599])
+def test_status_code_within_valid_range_is_accepted(status_code: int) -> None:
+    app = FastAPI()
+
+    @app.post("/items")
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status_code)
+
+
+@pytest.mark.parametrize("status_code", [100, 101, 199, 204, 304])
+def test_status_code_incompatible_with_response_body_is_rejected(status_code: int) -> None:
+    app = FastAPI()
+
+    with pytest.raises(ValueError, match="does not support a response body"):
+        override_validation_error(app, status_code=status_code)
 
 
 # ── runtime: query param ──────────────────────────────────────────────────────
