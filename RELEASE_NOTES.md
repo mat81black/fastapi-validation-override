@@ -9,6 +9,7 @@
 
 ### Fixes
 
+* 🐛 Fix cyclic and unresolvable `$ref` handling in local response resolution. PR [#45](https://github.com/mat81black/fastapi-validation-override/pull/45) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix invalid OpenAPI produced when merging into a $ref target response. PR [#40](https://github.com/mat81black/fastapi-validation-override/pull/40) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix user-defined schemas being silently overwritten by validation error definitions. PR [#39](https://github.com/mat81black/fastapi-validation-override/pull/39) by [@mat81black](https://github.com/mat81black).
 * 🐛 Base validation detection on FastAPI's 422 signal instead of schema shape alone. PR [#38](https://github.com/mat81black/fastapi-validation-override/pull/38) by [@mat81black](https://github.com/mat81black).
