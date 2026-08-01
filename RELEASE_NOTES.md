@@ -4,6 +4,7 @@
 
 ### Features
 
+* ✨ Support custom validation error schemas with any field structure. PR [#44](https://github.com/mat81black/fastapi-validation-override/pull/44) by [@mat81black](https://github.com/mat81black).
 * ✨ Extend validation error patching to webhooks and callbacks. PR [#35](https://github.com/mat81black/fastapi-validation-override/pull/35) by [@mat81black](https://github.com/mat81black).
 
 ### Fixes
