@@ -377,6 +377,14 @@ def test_status_code_false_is_rejected() -> None:
         override_validation_error(app, status_code=False)
 
 
+@pytest.mark.parametrize("status_code", [400.0, "400", None])
+def test_status_code_non_int_is_rejected(status_code: object) -> None:
+    app = FastAPI()
+
+    with pytest.raises(TypeError, match="must be an int"):
+        override_validation_error(app, status_code=status_code)  # type: ignore[arg-type]
+
+
 @pytest.mark.parametrize("status_code", [-1, 0, 99, 600, 999])
 def test_status_code_outside_valid_range_is_rejected(status_code: int) -> None:
     app = FastAPI()

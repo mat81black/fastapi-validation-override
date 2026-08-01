@@ -208,13 +208,14 @@ def override_validation_error(
         `status_code` is merged with the validation error schema using `anyOf`. If False,
         it is left untouched.
     :return: None. `app` is patched in place.
-    :raises TypeError: If `status_code` is a `bool`.
+    :raises TypeError: If `status_code` is not an `int` (a `bool` is also rejected, since it's
+        technically an `int` subclass in Python).
     :raises ValueError: If `status_code` is not a valid HTTP status code (100-599), or is one of
         the codes that must not carry a response body (1xx, 204, 304) — this library always
         returns one.
     """
-    if isinstance(status_code, bool):
-        raise TypeError(f"status_code must be an int, not bool: {status_code!r}")
+    if isinstance(status_code, bool) or not isinstance(status_code, int):
+        raise TypeError(f"status_code must be an int, got {type(status_code).__name__}: {status_code!r}")
     if not (100 <= status_code <= 599):
         raise ValueError(f"status_code must be a valid HTTP status code (100-599), got {status_code}")
     if status_code < 200 or status_code in (204, 304):

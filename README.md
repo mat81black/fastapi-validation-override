@@ -78,7 +78,7 @@ override_validation_error(app, status_code=400, handle_exceptions=True, merge_ta
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `app` | `FastAPI` | required | The FastAPI application instance to patch |
-| `status_code` | `int` | `400` | HTTP status code to use instead of 422. Must be a valid HTTP status code (`100`-`599`) that supports a response body, since this library always sends one — so `1xx`, `204`, and `304` are rejected. Calling with `422` is a no-op. Raises `TypeError` for `bool`, `ValueError` for anything else invalid |
+| `status_code` | `int` | `400` | HTTP status code to use instead of 422. Must be a valid HTTP status code (`100`-`599`) that supports a response body, since this library always sends one — so `1xx`, `204`, and `304` are rejected. Calling with `422` is a no-op. Raises `TypeError` if not an `int` (a `bool` is also rejected), `ValueError` for anything else invalid |
 | `handle_exceptions` | `bool` | `True` | When `True`, registers an exception handler that returns the custom status code at runtime. Set to `False` to patch only the OpenAPI schema and handle the exception yourself |
 | `merge_target_response` | `bool` | `True` | When `True`, a response you already declared at `status_code` is merged with the validation error schema using `anyOf`. When `False`, it's left untouched |
 
