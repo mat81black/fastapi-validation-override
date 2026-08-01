@@ -18,6 +18,10 @@
 
 * ♻️ Read FastAPI's validation error definitions dynamically instead of at import time. PR [#41](https://github.com/mat81black/fastapi-validation-override/pull/41) by [@mat81black](https://github.com/mat81black).
 
+### Docs
+
+* 📝 Clarify idempotency behavior in README. PR [#43](https://github.com/mat81black/fastapi-validation-override/pull/43) by [@mat81black](https://github.com/mat81black).
+
 ## 1.0.0 (2026-07-28)
 
 🎉 First stable release of fastapi-validation-override.
