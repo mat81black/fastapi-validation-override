@@ -377,6 +377,14 @@ def test_status_code_false_is_rejected() -> None:
         override_validation_error(app, status_code=False)
 
 
+@pytest.mark.parametrize("status_code", [400.0, "400", None])
+def test_status_code_non_int_is_rejected(status_code: object) -> None:
+    app = FastAPI()
+
+    with pytest.raises(TypeError, match="must be an int"):
+        override_validation_error(app, status_code=status_code)  # type: ignore[arg-type]
+
+
 @pytest.mark.parametrize("status_code", [-1, 0, 99, 600, 999])
 def test_status_code_outside_valid_range_is_rejected(status_code: int) -> None:
     app = FastAPI()
@@ -788,6 +796,43 @@ def test_resolve_validation_ref_rewrites_nested_ref_on_validation_error_collisio
     # ...but its nested $ref to ValidationError must point at the renamed component instead.
     nested_ref = schemas["HTTPValidationError"]["properties"]["detail"]["items"]["$ref"]
     assert nested_ref == f"{REF_PREFIX}FastAPIValidationOverride_ValidationError"
+
+
+def test_replace_ref_rewrites_ref_nested_inside_a_list() -> None:
+    value = {"anyOf": [{"$ref": f"{REF_PREFIX}ValidationError"}, {"type": "string"}]}
+
+    overrider_module._replace_ref(value, f"{REF_PREFIX}ValidationError", f"{REF_PREFIX}Renamed")
+
+    assert value == {"anyOf": [{"$ref": f"{REF_PREFIX}Renamed"}, {"type": "string"}]}
+
+
+def test_replace_ref_ignores_non_matching_refs() -> None:
+    value = {"$ref": f"{REF_PREFIX}SomethingElse"}
+
+    overrider_module._replace_ref(value, f"{REF_PREFIX}ValidationError", f"{REF_PREFIX}Renamed")
+
+    assert value == {"$ref": f"{REF_PREFIX}SomethingElse"}
+
+
+def test_resolve_validation_ref_rewrites_nested_ref_regardless_of_field_name() -> None:
+    """Reported bug: a custom definition using `dettagli` instead of `detail` raised KeyError
+    because the old code assumed the standard FastAPI envelope shape."""
+    original_http_validation_error = fastapi_openapi_utils.validation_error_response_definition
+    fastapi_openapi_utils.validation_error_response_definition = {
+        "title": "HTTPValidationError",
+        "type": "object",
+        "properties": {"dettagli": {"type": "array", "items": {"$ref": f"{REF_PREFIX}ValidationError"}}},
+    }
+    try:
+        schema = {"components": {"schemas": {"ValidationError": {"type": "string"}}}}
+        ref, name = overrider_module._resolve_validation_ref(schema)
+    finally:
+        fastapi_openapi_utils.validation_error_response_definition = original_http_validation_error
+
+    assert name == "HTTPValidationError"
+    nested_ref = schema["components"]["schemas"]["HTTPValidationError"]["properties"]["dettagli"]["items"]["$ref"]
+    assert nested_ref == f"{REF_PREFIX}FastAPIValidationOverride_ValidationError"
+    assert ref == {"$ref": f"{REF_PREFIX}HTTPValidationError"}
 
 
 def test_resolve_validation_ref_renames_only_http_validation_error_on_its_own_collision() -> None:
