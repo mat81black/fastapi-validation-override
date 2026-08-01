@@ -17,7 +17,7 @@ FastAPI returns 422 Unprocessable Entity for every request validation failure. M
 - **Independent of a custom 422**: if a route keeps its own, non-validation 422 response, it's left untouched and the validation schema is still documented at the target code
 - **Custom openapi preserved**: wraps any `app.openapi` function already installed and applies the patch on top of its output
 - **Bring your own handler**: `handle_exceptions=False` skips the built-in handler while still patching the schema
-- **Idempotent**: safe to call multiple times on the same app instance
+- **Idempotent**: safe to call multiple times on the same app instance. The first call configures the app; subsequent calls are ignored, even with different arguments — dynamic reconfiguration isn't supported
 - **No-op guard**: `status_code=422` leaves FastAPI behavior unchanged
 
 ## Requirements

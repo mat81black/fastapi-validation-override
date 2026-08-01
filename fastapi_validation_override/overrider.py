@@ -184,6 +184,9 @@ def override_validation_error(
     Cache management is intentionally delegated to the original `app.openapi` so that
     any custom OpenAPI function already set by the developer is fully preserved.
 
+    The first call configures the app. Subsequent calls on the same instance are ignored, even
+    with different arguments. Dynamic reconfiguration is not supported.
+
     :param app: The FastAPI application instance to patch.
     :param status_code: The HTTP status code to use instead of 422. Defaults to 400.
     :param handle_exceptions: If True, registers an exception handler that returns the custom
