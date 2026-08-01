@@ -23,6 +23,7 @@
 
 ### Docs
 
+* 📝 Clarify behavior for `ValidationError`/`HTTPValidationError` schema collisions in README. PR [#48](https://github.com/mat81black/fastapi-validation-override/pull/48) by [@mat81black](https://github.com/mat81black).
 * 📝 Clarify idempotency behavior in README. PR [#43](https://github.com/mat81black/fastapi-validation-override/pull/43) by [@mat81black](https://github.com/mat81black).
 
 ### Internal
