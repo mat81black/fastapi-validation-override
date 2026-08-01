@@ -265,6 +265,7 @@ Runnable examples are in the [`examples/`](https://github.com/mat81black/fastapi
 | [`existing_response_at_target_code.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/existing_response_at_target_code.py) | `anyOf` merge when the target code is already declared |
 | [`custom_422_response.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/custom_422_response.py) | Keeping a custom, non-validation 422 response |
 | [`with_apirouter.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/with_apirouter.py) | Usage with multiple `APIRouter` instances |
+| [`webhooks_and_callbacks.py`](https://github.com/mat81black/fastapi-validation-override/blob/main/examples/webhooks_and_callbacks.py) | Coverage extends to webhooks and callbacks, not just regular paths |
 
 ## Release Notes
 
