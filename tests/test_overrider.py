@@ -1301,6 +1301,81 @@ def test_patch_422_callbacks_are_patched() -> None:
     assert "400" in result["paths"]["/items"]["post"]["responses"]
 
 
+def test_patch_422_ref_callback_is_resolved_and_patched() -> None:
+    main_operation = _operation_with_422()
+    main_operation["callbacks"] = {"myCallback": {"$ref": "#/components/callbacks/EventCallback"}}
+    schema = {
+        "paths": {"/items": {"post": main_operation}},
+        "components": {
+            "callbacks": {
+                "EventCallback": {
+                    "{$callback_url}": {"post": _operation_with_422()},
+                }
+            }
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    callback_responses = result["paths"]["/items"]["post"]["callbacks"]["myCallback"]["$ref"]
+    # the $ref itself is left untouched; the referenced component is patched in place
+    assert callback_responses == "#/components/callbacks/EventCallback"
+    patched_component = result["components"]["callbacks"]["EventCallback"]["{$callback_url}"]["post"]["responses"]
+    assert "422" not in patched_component
+    assert "400" in patched_component
+
+
+def test_patch_422_chained_ref_callback_is_resolved_and_patched() -> None:
+    main_operation = _operation_with_422()
+    main_operation["callbacks"] = {"myCallback": {"$ref": "#/components/callbacks/Foo"}}
+    schema = {
+        "paths": {"/items": {"post": main_operation}},
+        "components": {
+            "callbacks": {
+                "Foo": {"$ref": "#/components/callbacks/Bar"},
+                "Bar": {
+                    "{$callback_url}": {"post": _operation_with_422()},
+                },
+            }
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    patched_component = result["components"]["callbacks"]["Bar"]["{$callback_url}"]["post"]["responses"]
+    assert "422" not in patched_component
+    assert "400" in patched_component
+
+
+def test_patch_422_cyclic_ref_callback_is_skipped() -> None:
+    main_operation = _operation_with_422()
+    main_operation["callbacks"] = {"myCallback": {"$ref": "#/components/callbacks/Foo"}}
+    schema = {
+        "paths": {"/items": {"post": main_operation}},
+        "components": {
+            "callbacks": {
+                "Foo": {"$ref": "#/components/callbacks/Bar"},
+                "Bar": {"$ref": "#/components/callbacks/Foo"},
+            }
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    # the cycle is skipped entirely, but the main path is still patched
+    assert "400" in result["paths"]["/items"]["post"]["responses"]
+
+
+def test_patch_422_external_ref_callback_is_skipped() -> None:
+    main_operation = _operation_with_422()
+    main_operation["callbacks"] = {"myCallback": {"$ref": "external.yaml#/components/callbacks/EventCallback"}}
+    schema = {"paths": {"/items": {"post": main_operation}}}
+
+    result = patch_422_responses(schema, "400")
+
+    assert "400" in result["paths"]["/items"]["post"]["responses"]
+
+
 def test_patch_422_skips_non_dict_entries_in_webhooks_and_callbacks() -> None:
     schema = {
         "paths": {

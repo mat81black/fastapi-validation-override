@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 
 _HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 _VALIDATION_ERROR_REF = {"$ref": f"{REF_PREFIX}HTTPValidationError"}
-_LOCAL_RESPONSE_REF_PREFIX = "#/components/responses/"
+_LOCAL_COMPONENT_REF_PREFIX = "#/components/"
 
 
 def _validation_error_ref(name: str = "HTTPValidationError") -> dict[str, str]:
@@ -32,8 +32,10 @@ def _iter_path_item_operations(path_item: dict[str, Any]) -> Iterator[dict[str, 
         yield operation
 
 
-def _iter_operations(schema: dict[str, Any]) -> Iterator[dict[str, Any]]:
+def _iter_operations(schema: dict[str, Any], root_schema: dict[str, Any] | None = None) -> Iterator[dict[str, Any]]:
     """Yield every Operation Object in the schema: paths, webhooks, and callbacks, recursively."""
+    root_schema = schema if root_schema is None else root_schema
+
     for container_key in ("paths", "webhooks"):
         container = schema.get(container_key)
         if not isinstance(container, dict):
@@ -49,31 +51,41 @@ def _iter_operations(schema: dict[str, Any]) -> Iterator[dict[str, Any]]:
                 callbacks = operation.get("callbacks")
                 if isinstance(callbacks, dict):
                     for callback_paths in callbacks.values():
+                        if not isinstance(callback_paths, dict):
+                            continue
+                        if "$ref" in callback_paths:
+                            callback_paths = _resolve_local_component(root_schema, callback_paths["$ref"], "callbacks")
                         if isinstance(callback_paths, dict):
-                            yield from _iter_operations({"paths": callback_paths})
+                            yield from _iter_operations({"paths": callback_paths}, root_schema)
 
 
-def _resolve_local_response(schema: dict[str, Any], ref: str) -> dict[str, Any] | None:
+def _resolve_local_component(schema: dict[str, Any], ref: str, section: str) -> dict[str, Any] | None:
     """
-    Resolve a local (in-document) $ref to a Response Object, following chained $refs until a
-    terminal (non-$ref) object is reached. Returns None if a step in the chain is external,
-    unresolvable, or the chain cycles back on itself.
+    Resolve a local (in-document) $ref within `components/<section>`, following chained $refs
+    until a terminal (non-$ref) object is reached. Returns None if a step in the chain is
+    external, unresolvable, or the chain cycles back on itself.
     """
+    prefix = f"{_LOCAL_COMPONENT_REF_PREFIX}{section}/"
     visited_refs: set[str] = set()
     while True:
-        if not ref.startswith(_LOCAL_RESPONSE_REF_PREFIX) or ref in visited_refs:
+        if not ref.startswith(prefix) or ref in visited_refs:
             return None
         visited_refs.add(ref)
 
-        name = ref[len(_LOCAL_RESPONSE_REF_PREFIX) :]
-        response = schema.get("components", {}).get("responses", {}).get(name)
-        if not isinstance(response, dict):
+        name = ref[len(prefix) :]
+        value = schema.get("components", {}).get(section, {}).get(name)
+        if not isinstance(value, dict):
             return None
 
-        next_ref = response.get("$ref")
+        next_ref = value.get("$ref")
         if next_ref is None:
-            return response
+            return value
         ref = next_ref
+
+
+def _resolve_local_response(schema: dict[str, Any], ref: str) -> dict[str, Any] | None:
+    """Resolve a local (in-document) $ref to a Response Object. See `_resolve_local_component`."""
+    return _resolve_local_component(schema, ref, "responses")
 
 
 def _replace_ref(value: Any, old_ref: str, new_ref: str) -> None:
