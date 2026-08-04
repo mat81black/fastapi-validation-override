@@ -2,6 +2,10 @@
 
 ## Latest Changes
 
+### Internal
+
+* ⬆ Bump the github-actions group with 2 updates. PR [#50](https://github.com/mat81black/fastapi-validation-override/pull/50) by [@dependabot[bot]](https://github.com/apps/dependabot).
+
 ## 1.1.0 (2026-08-01)
 
 ### Features
