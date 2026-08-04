@@ -4,6 +4,7 @@
 
 ### Internal
 
+* ✅ Prove PR test changes actually catch a regression before merging. PR [#53](https://github.com/mat81black/fastapi-validation-override/pull/53) by [@mat81black](https://github.com/mat81black).
 * ⬆ Bump fastapi from 0.139.2 to 0.140.0. PR [#52](https://github.com/mat81black/fastapi-validation-override/pull/52) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * ⬆ Bump the python-packages group with 5 updates. PR [#51](https://github.com/mat81black/fastapi-validation-override/pull/51) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * ⬆ Bump the github-actions group with 2 updates. PR [#50](https://github.com/mat81black/fastapi-validation-override/pull/50) by [@dependabot[bot]](https://github.com/apps/dependabot).
