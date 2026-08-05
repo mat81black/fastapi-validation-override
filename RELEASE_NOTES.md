@@ -4,6 +4,7 @@
 
 ### Internal
 
+* 🐛 Reject invalid bump types and cover prepare_release's untested error paths. PR [#56](https://github.com/mat81black/fastapi-validation-override/pull/56) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix partial release state when release notes update fails. PR [#55](https://github.com/mat81black/fastapi-validation-override/pull/55) by [@mat81black](https://github.com/mat81black).
 * ⬆️ Bump tiangolo/latest-changes to 0.7.1. PR [#54](https://github.com/mat81black/fastapi-validation-override/pull/54) by [@mat81black](https://github.com/mat81black).
 * ✅ Prove PR test changes actually catch a regression before merging. PR [#53](https://github.com/mat81black/fastapi-validation-override/pull/53) by [@mat81black](https://github.com/mat81black).
