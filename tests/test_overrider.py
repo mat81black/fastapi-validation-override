@@ -1366,6 +1366,55 @@ def test_patch_422_cyclic_ref_callback_is_skipped() -> None:
     assert "400" in result["paths"]["/items"]["post"]["responses"]
 
 
+def test_patch_422_structurally_self_referential_callback_does_not_recurse_forever() -> None:
+    main_operation = _operation_with_422()
+    main_operation["callbacks"] = {"onEvent": {"$ref": "#/components/callbacks/EventCallback"}}
+    nested_operation = _operation_with_422()
+    # the callback's own nested operation refers back to the same component it lives inside of
+    nested_operation["callbacks"] = {"onAck": {"$ref": "#/components/callbacks/EventCallback"}}
+    schema = {
+        "paths": {"/items": {"post": main_operation}},
+        "components": {
+            "callbacks": {
+                "EventCallback": {
+                    "{$callback_url}": {"post": nested_operation},
+                }
+            }
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    assert "400" in result["paths"]["/items"]["post"]["responses"]
+    patched_nested = result["components"]["callbacks"]["EventCallback"]["{$callback_url}"]["post"]["responses"]
+    assert "400" in patched_nested
+
+
+def test_patch_422_same_callback_reused_by_two_unrelated_operations_is_patched_for_both() -> None:
+    operation_a = _operation_with_422()
+    operation_a["callbacks"] = {"e": {"$ref": "#/components/callbacks/Shared"}}
+    operation_b = _operation_with_422()
+    operation_b["callbacks"] = {"e": {"$ref": "#/components/callbacks/Shared"}}
+    schema = {
+        "paths": {
+            "/subscribe-a": {"post": operation_a},
+            "/subscribe-b": {"post": operation_b},
+        },
+        "components": {
+            "callbacks": {
+                "Shared": {"{$callback_url}": {"post": _operation_with_422()}},
+            }
+        },
+    }
+
+    result = patch_422_responses(schema, "400")
+
+    assert "400" in result["paths"]["/subscribe-a"]["post"]["responses"]
+    assert "400" in result["paths"]["/subscribe-b"]["post"]["responses"]
+    shared_responses = result["components"]["callbacks"]["Shared"]["{$callback_url}"]["post"]["responses"]
+    assert "400" in shared_responses
+
+
 def test_patch_422_external_ref_callback_is_skipped() -> None:
     main_operation = _operation_with_422()
     main_operation["callbacks"] = {"myCallback": {"$ref": "external.yaml#/components/callbacks/EventCallback"}}
