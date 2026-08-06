@@ -32,8 +32,21 @@ def _iter_path_item_operations(path_item: dict[str, Any]) -> Iterator[dict[str, 
         yield operation
 
 
-def _iter_operations(schema: dict[str, Any], root_schema: dict[str, Any] | None = None) -> Iterator[dict[str, Any]]:
-    """Yield every Operation Object in the schema: paths, webhooks, and callbacks, recursively."""
+def _iter_operations(
+    schema: dict[str, Any],
+    root_schema: dict[str, Any] | None = None,
+    ancestor_callback_refs: frozenset[str] = frozenset(),
+) -> Iterator[dict[str, Any]]:
+    """
+    Yield every Operation Object in the schema: paths, webhooks, and callbacks, recursively.
+
+    `ancestor_callback_refs` tracks the `$ref` callback components already being expanded on the
+    current recursion path, so a callback that structurally refers back to one of its own ancestors
+    (e.g. a nested operation's `callbacks` pointing at the same `#/components/callbacks/...` it's
+    already inside of) is skipped instead of recursing forever. It does not persist across unrelated
+    branches, so the same reusable callback component referenced from two independent operations is
+    still expanded for both.
+    """
     root_schema = schema if root_schema is None else root_schema
 
     for container_key in ("paths", "webhooks"):
@@ -53,10 +66,15 @@ def _iter_operations(schema: dict[str, Any], root_schema: dict[str, Any] | None 
                     for callback_paths in callbacks.values():
                         if not isinstance(callback_paths, dict):
                             continue
+                        next_ancestor_refs = ancestor_callback_refs
                         if "$ref" in callback_paths:
-                            callback_paths = _resolve_local_component(root_schema, callback_paths["$ref"], "callbacks")
+                            ref = callback_paths["$ref"]
+                            if ref in ancestor_callback_refs:
+                                continue
+                            callback_paths = _resolve_local_component(root_schema, ref, "callbacks")
+                            next_ancestor_refs = ancestor_callback_refs | {ref}
                         if isinstance(callback_paths, dict):
-                            yield from _iter_operations({"paths": callback_paths}, root_schema)
+                            yield from _iter_operations({"paths": callback_paths}, root_schema, next_ancestor_refs)
 
 
 def _resolve_local_component(schema: dict[str, Any], ref: str, section: str) -> dict[str, Any] | None:
