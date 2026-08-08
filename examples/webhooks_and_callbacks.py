@@ -1,3 +1,11 @@
+"""
+The override covers webhooks and callbacks the same way it covers regular paths.
+
+Run:
+
+    uvicorn examples.webhooks_and_callbacks:app --reload
+"""
+
 from typing import Any
 
 from fastapi import APIRouter, FastAPI
@@ -40,8 +48,3 @@ async def create_item(item: Item) -> dict[str, Any]:
 override_validation_error(app)
 # The webhook and the callback each get their own 400 response documented, independently of
 # /items and of each other.
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8008)

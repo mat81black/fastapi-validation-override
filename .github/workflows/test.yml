@@ -36,6 +36,7 @@ jobs:
         filters: |
           src:
             - .github/workflows/test.yml
+            - examples/**
             - fastapi_validation_override/**
             - scripts/**
             - tests/**

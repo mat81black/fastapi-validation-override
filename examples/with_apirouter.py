@@ -1,3 +1,11 @@
+"""
+The override applies to every route regardless of how it's organized across APIRouters.
+
+Run:
+
+    uvicorn examples.with_apirouter:app --reload
+"""
+
 from typing import Any
 
 from fastapi import APIRouter, FastAPI
@@ -38,8 +46,3 @@ app.include_router(items_router)
 app.include_router(users_router)
 
 override_validation_error(app)
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8005)
