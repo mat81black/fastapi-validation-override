@@ -8,6 +8,7 @@
 
 ### Internal
 
+* 🐛 Fix partial release state when release notes write fails. PR [#59](https://github.com/mat81black/fastapi-validation-override/pull/59) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix infinite recursion on self-referential callback components. PR [#57](https://github.com/mat81black/fastapi-validation-override/pull/57) by [@mat81black](https://github.com/mat81black).
 * 🐛 Reject invalid bump types and cover prepare_release's untested error paths. PR [#56](https://github.com/mat81black/fastapi-validation-override/pull/56) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix partial release state when release notes update fails. PR [#55](https://github.com/mat81black/fastapi-validation-override/pull/55) by [@mat81black](https://github.com/mat81black).
