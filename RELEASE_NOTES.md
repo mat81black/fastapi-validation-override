@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 1.1.1 (2026-08-08)
+
 ### Fixes
 
 * 🐛 Fix orphaned validation schema components left in the OpenAPI output. PR [#66](https://github.com/mat81black/fastapi-validation-override/pull/66) by [@mat81black](https://github.com/mat81black).
