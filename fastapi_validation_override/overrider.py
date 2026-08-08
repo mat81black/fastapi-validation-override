@@ -122,7 +122,8 @@ def _resolve_validation_ref(schema: dict[str, Any]) -> tuple[dict[str, str], str
     """
     Ensure ValidationError/HTTPValidationError components exist in `schema`, picking an alternate
     name for either one the schema already declares for something else. Returns a $ref to the
-    HTTPValidationError component and the name it was inserted under.
+    HTTPValidationError component and the name it is registered under — inserted by this call if
+    absent, or an already-matching component left untouched.
     """
     components = schema.setdefault("components", {}).setdefault("schemas", {})
 
@@ -253,7 +254,8 @@ def override_validation_error(
     with different arguments. Dynamic reconfiguration is not supported.
 
     :param app: The FastAPI application instance to patch.
-    :param status_code: The HTTP status code to use instead of 422. Defaults to 400.
+    :param status_code: The HTTP status code to use instead of 422. Defaults to 400. Passing 422
+        is a no-op: the app is left completely unpatched, matching FastAPI's own default.
     :param handle_exceptions: If True, registers an exception handler that returns the custom
         status code at runtime. Set to False to patch only the OpenAPI schema and
         handle the exception yourself.
@@ -279,7 +281,6 @@ def override_validation_error(
     if status_code == 422:
         return
 
-    # Guard against registering duplicate handlers and patches on repeated calls.
     if getattr(app.state, "_validation_overridden", False):
         return
 
