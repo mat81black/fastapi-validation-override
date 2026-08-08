@@ -8,6 +8,7 @@
 
 ### Internal
 
+* 📝 Clarify docstrings for the 422 no-op and validation ref naming. PR [#63](https://github.com/mat81black/fastapi-validation-override/pull/63) by [@mat81black](https://github.com/mat81black).
 * ✅ Add test to ensure overriding validation error ignores subsequent calls with different args. PR [#62](https://github.com/mat81black/fastapi-validation-override/pull/62) by [@mat81black](https://github.com/mat81black).
 * ✅ Add regression test for hidden query parameters with undocumented 422 behavior. PR [#61](https://github.com/mat81black/fastapi-validation-override/pull/61) by [@mat81black](https://github.com/mat81black).
 * 🎨 Standardize how examples are run and documented. PR [#60](https://github.com/mat81black/fastapi-validation-override/pull/60) by [@mat81black](https://github.com/mat81black).
