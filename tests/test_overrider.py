@@ -451,6 +451,39 @@ async def test_hidden_query_param_still_documents_and_returns_target_code() -> N
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
+async def test_hidden_query_param_with_existing_422_leaves_target_code_undocumented() -> None:
+    """
+    Regression pin for the documented limitation: a hidden parameter's operation is only detected
+    as needing validation via FastAPI's own 422 response or a visible requestBody/parameters. If the
+    route already occupies 422 with something else, neither signal fires, so target_code stays
+    undocumented — even though the route still returns it at runtime.
+    """
+    from typing import Annotated
+
+    from fastapi import Query
+
+    class Forbidden(BaseModel):  # pragma: no cover
+        reason: str
+
+    app = FastAPI()
+
+    @app.get("/hidden", responses={422: {"model": Forbidden, "description": "Forbidden"}})
+    async def hidden(secret: Annotated[int, Query(include_in_schema=False)]) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+
+    async with _client(app) as client:
+        schema = (await client.get("/openapi.json")).json()
+        response = await client.get("/hidden", params={"secret": "not-a-number"})
+
+    operation = schema["paths"]["/hidden"]["get"]
+    assert "parameters" not in operation
+    assert list(operation["responses"].keys()) == ["200", "422"]
+    assert "400" not in operation["responses"]
+    # The runtime behavior is unaffected by the documentation gap: it still returns target_code.
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
 # ── schema: path con metodi multipli ─────────────────────────────────────────
 
 
