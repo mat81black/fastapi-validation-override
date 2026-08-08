@@ -1,3 +1,11 @@
+"""
+Replace the validation error schema with a custom error envelope.
+
+Run:
+
+    uvicorn examples.custom_validation_schema:app --reload
+"""
+
 from typing import Any
 
 import fastapi.openapi.utils as fastapi_openapi_utils
@@ -64,8 +72,3 @@ async def create_item(item: Item) -> dict[str, Any]:
 
 override_validation_error(app, status_code=400, handle_exceptions=False)
 # handle_exceptions=False: the handler above is already responsible for matching the schema above.
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8007)

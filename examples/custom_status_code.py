@@ -1,3 +1,11 @@
+"""
+Use a custom status code (409) instead of the default 400.
+
+Run:
+
+    uvicorn examples.custom_status_code:app --reload
+"""
+
 from typing import Any
 
 from fastapi import FastAPI
@@ -22,8 +30,3 @@ async def create_item(item: Item) -> dict[str, Any]:
 
 
 override_validation_error(app, status_code=409)
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8001)

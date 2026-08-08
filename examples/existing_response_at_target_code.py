@@ -1,3 +1,11 @@
+"""
+Merge the validation error schema into a response already declared at the target status code.
+
+Run:
+
+    uvicorn examples.existing_response_at_target_code:app --reload
+"""
+
 from typing import Any
 
 from fastapi import FastAPI
@@ -28,8 +36,3 @@ async def create_item(item: Item) -> dict[str, Any]:
 
 
 override_validation_error(app)
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8004)

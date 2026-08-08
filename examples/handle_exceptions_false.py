@@ -1,3 +1,11 @@
+"""
+Patch only the OpenAPI schema and handle the validation exception yourself.
+
+Run:
+
+    uvicorn examples.handle_exceptions_false:app --reload
+"""
+
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -35,8 +43,3 @@ async def create_item(item: Item) -> dict[str, Any]:
 
 
 override_validation_error(app, status_code=400, handle_exceptions=False)
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8002)

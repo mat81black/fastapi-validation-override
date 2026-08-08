@@ -1,3 +1,11 @@
+"""
+Preserve a custom app.openapi function: the library wraps it and patches its output on top.
+
+Run:
+
+    uvicorn examples.custom_openapi:app --reload
+"""
+
 from typing import Any
 
 from fastapi import FastAPI
@@ -34,8 +42,3 @@ def custom_openapi() -> dict[str, Any]:
 app.openapi = custom_openapi  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
 
 override_validation_error(app)
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8003)

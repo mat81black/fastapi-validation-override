@@ -1,3 +1,12 @@
+"""
+Keep a route's own, non-validation 422 response; the validation error is still documented
+at the target status code independently of what occupies 422.
+
+Run:
+
+    uvicorn examples.custom_422_response:app --reload
+"""
+
 from typing import Any
 
 from fastapi import FastAPI
@@ -31,8 +40,3 @@ override_validation_error(app)
 # The 422 response above is left untouched: it still documents OutOfStockError.
 # The 400 response is added automatically, documenting the validation error schema,
 # because this route still validates its request body regardless of what occupies 422.
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8006)

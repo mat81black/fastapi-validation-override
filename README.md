@@ -255,7 +255,7 @@ override_validation_error(app)
 
 ## Examples
 
-Runnable examples are in the [`examples/`](https://github.com/mat81black/fastapi-validation-override/tree/main/examples) directory:
+Runnable examples are in the [`examples/`](https://github.com/mat81black/fastapi-validation-override/tree/main/examples) directory. Run any of them from the project root with `uvicorn examples.<name>:app --reload`, e.g. `uvicorn examples.basic:app --reload`, then open `http://127.0.0.1:8000/docs`:
 
 | File | Description |
 |---|---|
