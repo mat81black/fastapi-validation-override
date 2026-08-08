@@ -2,6 +2,10 @@
 
 ## Latest Changes
 
+### Fixes
+
+* 🐛 Fix orphaned validation schema components left in the OpenAPI output. PR [#66](https://github.com/mat81black/fastapi-validation-override/pull/66) by [@mat81black](https://github.com/mat81black).
+
 ### Docs
 
 * 📝 Clarify that patch_422_responses targets get_openapi() output. PR [#58](https://github.com/mat81black/fastapi-validation-override/pull/58) by [@mat81black](https://github.com/mat81black).
