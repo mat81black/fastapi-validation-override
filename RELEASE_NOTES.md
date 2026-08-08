@@ -8,6 +8,7 @@
 
 ### Internal
 
+* ✅ Add regression test for hidden query parameters with undocumented 422 behavior. PR [#61](https://github.com/mat81black/fastapi-validation-override/pull/61) by [@mat81black](https://github.com/mat81black).
 * 🎨 Standardize how examples are run and documented. PR [#60](https://github.com/mat81black/fastapi-validation-override/pull/60) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix partial release state when release notes write fails. PR [#59](https://github.com/mat81black/fastapi-validation-override/pull/59) by [@mat81black](https://github.com/mat81black).
 * 🐛 Fix infinite recursion on self-referential callback components. PR [#57](https://github.com/mat81black/fastapi-validation-override/pull/57) by [@mat81black](https://github.com/mat81black).
