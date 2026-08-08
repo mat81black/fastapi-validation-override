@@ -331,6 +331,31 @@ async def test_double_call_idempotent_schema() -> None:
     assert "anyOf" not in content.get("schema", {})
 
 
+async def test_double_call_with_different_arguments_keeps_first_call_behavior() -> None:
+    """The docstring promises the second call is ignored 'even with different arguments' — pin that
+    a differing status_code, handle_exceptions, and merge_target_response on the second call have no
+    effect, at runtime and in the schema."""
+    app = FastAPI()
+
+    @app.post("/items")
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST)
+    override_validation_error(
+        app, status_code=status.HTTP_409_CONFLICT, handle_exceptions=False, merge_target_response=False
+    )
+
+    async with _client(app) as client:
+        response = await client.post("/items", json={"name": "test"})
+        schema = (await client.get("/openapi.json")).json()
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    responses = schema["paths"]["/items"]["post"]["responses"]
+    assert "422" not in responses
+    assert "409" not in responses
+    assert "400" in responses
+
+
 # ── guard status_code=422 ─────────────────────────────────────────────────────
 
 
