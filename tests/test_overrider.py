@@ -462,7 +462,7 @@ async def test_hidden_query_param_with_existing_422_leaves_target_code_undocumen
 
     from fastapi import Query
 
-    class Forbidden(BaseModel):
+    class Forbidden(BaseModel):  # pragma: no cover
         reason: str
 
     app = FastAPI()
