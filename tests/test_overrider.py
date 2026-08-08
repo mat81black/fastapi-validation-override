@@ -4,8 +4,10 @@ from typing import Any
 import fastapi.openapi.utils as fastapi_openapi_utils
 import pytest
 
-from fastapi import FastAPI, status
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.constants import REF_PREFIX
+from fastapi.responses import JSONResponse
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel
 
@@ -83,6 +85,25 @@ async def test_handle_exceptions_false_runtime_keeps_422() -> None:
         response = await client.post("/items", json={"name": "test"})
 
     assert response.status_code == 422
+
+
+async def test_handle_exceptions_false_preserves_pre_existing_custom_handler() -> None:
+    app = FastAPI()
+
+    @app.exception_handler(RequestValidationError)
+    async def custom_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"message": "custom", "errors": exc.errors()})
+
+    @app.post("/items")
+    async def create_item(item: Item) -> dict[str, Any]: ...
+
+    override_validation_error(app, status_code=status.HTTP_400_BAD_REQUEST, handle_exceptions=False)
+
+    async with _client(app) as client:
+        response = await client.post("/items", json={"name": "test"})
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()["message"] == "custom"
 
 
 # ── schema: rotte con body ────────────────────────────────────────────────────
