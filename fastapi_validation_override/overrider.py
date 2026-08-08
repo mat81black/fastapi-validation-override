@@ -158,13 +158,21 @@ def patch_422_responses(
     Move FastAPI's 422 validation error response to `target_code`, across paths, webhooks, and
     callbacks (recursively, for callbacks declared on any operation).
 
+    Designed for schemas produced by `fastapi.openapi.utils.get_openapi()` — the same generator
+    `app.openapi()` uses internally. It's exposed publicly so it can be patched outside
+    `override_validation_error`, e.g. from a custom `app.openapi` function or a tool that builds its
+    own per-version schema via `get_openapi()`. It is not meant as a general-purpose processor for
+    arbitrary or hand-authored OpenAPI documents: correctness on documents built by hand or by other
+    tools is best-effort, not a guarantee.
+
     A parameter declared with `include_in_schema=False` still triggers validation at runtime, but
     is invisible in the generated schema. If such a route also already occupies 422, `4XX`, or
     `default` with something else, FastAPI never emits its own 422 response for that operation —
     the only signal this function relies on to detect the need for validation on such a parameter.
     In that specific combination, `target_code` won't be documented.
 
-    :param schema: An OpenAPI schema dict, such as one returned by `app.openapi()`.
+    :param schema: An OpenAPI schema dict produced by `fastapi.openapi.utils.get_openapi()`, such as
+        one returned by `app.openapi()`.
     :param target_code: The status code to document the validation error at, e.g. `"400"`.
     :param merge_target_response: If True (default), a response already declared at `target_code`
         is merged with the validation error schema using `anyOf`. If False, it is left untouched.

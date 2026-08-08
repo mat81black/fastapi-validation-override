@@ -90,11 +90,13 @@ patch_422_responses(schema, target_code, merge_target_response=True)
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `schema` | `dict[str, Any]` | required | An OpenAPI schema dict, such as one returned by `app.openapi()` |
+| `schema` | `dict[str, Any]` | required | An OpenAPI schema dict produced by `fastapi.openapi.utils.get_openapi()`, such as one returned by `app.openapi()` |
 | `target_code` | `str` | required | The status code to document the validation error at, e.g. `"400"` |
 | `merge_target_response` | `bool` | `True` | Same as the `override_validation_error` parameter of the same name |
 
-The schema-patching logic that `override_validation_error` uses internally, exposed as a standalone function for advanced use cases, such as patching a schema inside your own custom `app.openapi` function without going through `override_validation_error`. Mutates `schema` in place and also returns it.
+The schema-patching logic that `override_validation_error` uses internally, exposed as a standalone function for advanced use cases, such as patching a schema inside your own custom `app.openapi` function, or a schema built directly via `get_openapi()`, without going through `override_validation_error`. Mutates `schema` in place and also returns it.
+
+Designed for schemas coming from `get_openapi()` — the same generator FastAPI itself uses. It isn't meant as a general-purpose processor for arbitrary or hand-authored OpenAPI documents: correctness on shapes `get_openapi()` never produces is best-effort, not a guarantee.
 
 ```python
 from fastapi_validation_override import patch_422_responses

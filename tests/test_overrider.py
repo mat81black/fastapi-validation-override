@@ -848,7 +848,7 @@ def test_resolve_validation_ref_renames_only_http_validation_error_on_its_own_co
 
 
 def test_resolve_validation_ref_reads_definitions_dynamically() -> None:
-    """fastapibase reassigns these globals for i18n before calling override_validation_error;
+    """A caller may reassign these globals (e.g. for i18n) before calling override_validation_error;
     a frozen import would keep using the original English definitions instead."""
     custom_validation_error = {"title": "ErroreValidazione", "type": "object", "properties": {"codice": {}}}
     custom_http_validation_error = {
