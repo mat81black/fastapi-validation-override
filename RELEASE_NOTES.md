@@ -2,6 +2,10 @@
 
 ## Latest Changes
 
+### Docs
+
+* 📝 Clarify that patch_422_responses targets get_openapi() output. PR [#58](https://github.com/mat81black/fastapi-validation-override/pull/58) by [@mat81black](https://github.com/mat81black).
+
 ### Internal
 
 * 🐛 Fix infinite recursion on self-referential callback components. PR [#57](https://github.com/mat81black/fastapi-validation-override/pull/57) by [@mat81black](https://github.com/mat81black).
