@@ -199,10 +199,6 @@ def patch_422_responses(
         if not (removed_fastapi_422 or _operation_needs_validation(operation)):
             continue
 
-        if validation is None:
-            validation = _resolve_validation_ref(schema)
-        validation_ref, validation_ref_name = validation
-
         if target_code in responses:
             if not merge_target_response:
                 continue
@@ -214,6 +210,10 @@ def patch_422_responses(
                     continue
                 existing_response = deepcopy(resolved)
                 responses[target_code] = existing_response
+
+            if validation is None:
+                validation = _resolve_validation_ref(schema)
+            validation_ref, validation_ref_name = validation
 
             existing_content = existing_response.setdefault("content", {}).setdefault("application/json", {})
             existing_schema = existing_content.setdefault("schema", {})
@@ -230,6 +230,10 @@ def patch_422_responses(
             if "Validation Error" not in old_desc:
                 existing_response["description"] = f"{old_desc} / Validation Error"
         else:
+            if validation is None:
+                validation = _resolve_validation_ref(schema)
+            validation_ref_name = validation[1]
+
             responses[target_code] = {
                 "description": "Validation Error",
                 "content": {"application/json": {"schema": _validation_error_ref(validation_ref_name)}},
