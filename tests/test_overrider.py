@@ -991,6 +991,8 @@ def test_patch_422_merge_target_response_false_leaves_existing_target_untouched(
     response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
     assert response_400["content"]["application/json"]["schema"]["$ref"].endswith("OutOfStockError")
     assert response_400["description"] == "Out of stock"
+    # no $ref to ValidationError/HTTPValidationError was ever written, so they must not be inserted
+    assert "components" not in result
 
 
 def test_patch_422_merge_target_response_false_still_removes_native_422() -> None:
@@ -1060,6 +1062,8 @@ def test_patch_422_target_as_external_response_ref_is_left_untouched() -> None:
 
     response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
     assert response_400 == {"$ref": "external.yaml#/components/responses/Foo"}
+    # no $ref to ValidationError/HTTPValidationError was ever written, so they must not be inserted
+    assert "components" not in result
 
 
 def test_patch_422_target_as_unresolvable_local_response_ref_is_left_untouched() -> None:
@@ -1075,6 +1079,8 @@ def test_patch_422_target_as_unresolvable_local_response_ref_is_left_untouched()
 
     response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
     assert response_400 == {"$ref": "#/components/responses/Missing"}
+    # no $ref to ValidationError/HTTPValidationError was ever written, so they must not be inserted
+    assert "components" not in result
 
 
 def test_patch_422_target_as_chained_local_response_ref_merges_on_inlined_copy() -> None:
