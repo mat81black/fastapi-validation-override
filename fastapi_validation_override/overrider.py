@@ -12,7 +12,6 @@ from fastapi.responses import JSONResponse
 
 _HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 _VALIDATION_ERROR_REF = {"$ref": f"{REF_PREFIX}HTTPValidationError"}
-_LOCAL_COMPONENT_REF_PREFIX = "#/components/"
 
 
 def _validation_error_ref(name: str = "HTTPValidationError") -> dict[str, str]:
@@ -32,23 +31,12 @@ def _iter_path_item_operations(path_item: dict[str, Any]) -> Iterator[dict[str, 
         yield operation
 
 
-def _iter_operations(
-    schema: dict[str, Any],
-    root_schema: dict[str, Any] | None = None,
-    ancestor_callback_refs: frozenset[str] = frozenset(),
-) -> Iterator[dict[str, Any]]:
+def _iter_operations(schema: dict[str, Any]) -> Iterator[dict[str, Any]]:
     """
     Yield every Operation Object in the schema: paths, webhooks, and callbacks, recursively.
-
-    `ancestor_callback_refs` tracks the `$ref` callback components already being expanded on the
-    current recursion path, so a callback that structurally refers back to one of its own ancestors
-    (e.g. a nested operation's `callbacks` pointing at the same `#/components/callbacks/...` it's
-    already inside of) is skipped instead of recursing forever. It does not persist across unrelated
-    branches, so the same reusable callback component referenced from two independent operations is
-    still expanded for both.
+    A callback declared as a `$ref` instead of an inline Path Item mapping is silently skipped:
+    `get_openapi()` never produces one, and this module doesn't resolve `$ref`s.
     """
-    root_schema = schema if root_schema is None else root_schema
-
     for container_key in ("paths", "webhooks"):
         container = schema.get(container_key)
         if not isinstance(container, dict):
@@ -64,46 +52,8 @@ def _iter_operations(
                 callbacks = operation.get("callbacks")
                 if isinstance(callbacks, dict):
                     for callback_paths in callbacks.values():
-                        if not isinstance(callback_paths, dict):
-                            continue
-                        next_ancestor_refs = ancestor_callback_refs
-                        if "$ref" in callback_paths:
-                            ref = callback_paths["$ref"]
-                            if ref in ancestor_callback_refs:
-                                continue
-                            callback_paths = _resolve_local_component(root_schema, ref, "callbacks")
-                            next_ancestor_refs = ancestor_callback_refs | {ref}
                         if isinstance(callback_paths, dict):
-                            yield from _iter_operations({"paths": callback_paths}, root_schema, next_ancestor_refs)
-
-
-def _resolve_local_component(schema: dict[str, Any], ref: str, section: str) -> dict[str, Any] | None:
-    """
-    Resolve a local (in-document) $ref within `components/<section>`, following chained $refs
-    until a terminal (non-$ref) object is reached. Returns None if a step in the chain is
-    external, unresolvable, or the chain cycles back on itself.
-    """
-    prefix = f"{_LOCAL_COMPONENT_REF_PREFIX}{section}/"
-    visited_refs: set[str] = set()
-    while True:
-        if not ref.startswith(prefix) or ref in visited_refs:
-            return None
-        visited_refs.add(ref)
-
-        name = ref[len(prefix) :]
-        value = schema.get("components", {}).get(section, {}).get(name)
-        if not isinstance(value, dict):
-            return None
-
-        next_ref = value.get("$ref")
-        if next_ref is None:
-            return value
-        ref = next_ref
-
-
-def _resolve_local_response(schema: dict[str, Any], ref: str) -> dict[str, Any] | None:
-    """Resolve a local (in-document) $ref to a Response Object. See `_resolve_local_component`."""
-    return _resolve_local_component(schema, ref, "responses")
+                            yield from _iter_operations({"paths": callback_paths})
 
 
 def _replace_ref(value: Any, old_ref: str, new_ref: str) -> None:
@@ -177,10 +127,9 @@ def patch_422_responses(
     :param target_code: The status code to document the validation error at, e.g. `"400"`.
     :param merge_target_response: If True (default), a response already declared at `target_code`
         is merged with the validation error schema using `anyOf`. If False, it is left untouched.
-        If that response is a local `$ref` to `#/components/responses/...`, chained refs are
-        followed to the terminal Response Object and the merge happens on an inlined copy,
-        leaving the shared components untouched; an external, unresolvable, or cyclic `$ref`
-        is left as-is.
+        A response declared as a `$ref` is always left untouched regardless of this flag:
+        `get_openapi()` never produces one at a route's own declared status code, and this module
+        doesn't resolve `$ref`s.
     :return: The same `schema` dict, mutated in place.
     """
     validation: tuple[dict[str, str], str] | None = None
@@ -205,11 +154,7 @@ def patch_422_responses(
 
             existing_response = responses[target_code]
             if "$ref" in existing_response:
-                resolved = _resolve_local_response(schema, existing_response["$ref"])
-                if resolved is None:
-                    continue
-                existing_response = deepcopy(resolved)
-                responses[target_code] = existing_response
+                continue
 
             if validation is None:
                 validation = _resolve_validation_ref(schema)
