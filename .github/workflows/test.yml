@@ -19,38 +19,35 @@ jobs:
     runs-on: ubuntu-latest
     # Required permissions
     permissions:
-      contents: read
       pull-requests: read
     timeout-minutes: 5
     # Set job outputs to values from filter step
     outputs:
       src: ${{ steps.filter.outputs.src }}
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        persist-credentials: false
-    # For pull requests it's not necessary to checkout the code but for the main branch it is
-    - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
-      id: filter
-      with:
-        filters: |
-          src:
-            - .github/workflows/test.yml
-            - examples/**
-            - fastapi_validation_override/**
-            - scripts/**
-            - tests/**
-            - .python-version
-            - pyproject.toml
-            - uv.lock
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # For pull requests it's not necessary to checkout the code but for the main branch it is
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        id: filter
+        with:
+          filters: |
+            src:
+              - .github/workflows/test.yml
+              - examples/**
+              - fastapi_validation_override/**
+              - scripts/**
+              - tests/**
+              - .python-version
+              - pyproject.toml
+              - uv.lock
 
   test:
     needs:
       - changes
     if: needs.changes.outputs.src == 'true' || github.ref == 'refs/heads/main'
     timeout-minutes: 15
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -122,8 +119,6 @@ jobs:
   regression-test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: read
     steps:
       - name: Check out the pull request
         if: github.event_name == 'pull_request'
@@ -204,8 +199,6 @@ jobs:
       - test
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      contents: read
     steps:
       - name: Dump GitHub context
         env:

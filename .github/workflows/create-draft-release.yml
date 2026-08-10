@@ -16,7 +16,7 @@ jobs:
       contents: write
     env:
       PREPARE_RELEASE_VERSION_FILE: fastapi_validation_override/__init__.py
-      PREPARE_RELEASE_RELEASE_NOTES_FILE: RELEASE_NOTES.md
+      PREPARE_RELEASE_RELEASE_NOTES_FILE: release-notes.md
     steps:
       - name: Dump GitHub context
         env:
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
-          persist-credentials: true
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

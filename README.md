@@ -271,7 +271,7 @@ Runnable examples are in the [`examples/`](https://github.com/mat81black/fastapi
 
 ## Release Notes
 
-[RELEASE_NOTES](https://github.com/mat81black/fastapi-validation-override/blob/main/RELEASE_NOTES.md)
+[RELEASE_NOTES](https://github.com/mat81black/fastapi-validation-override/blob/main/release-notes.md)
 
 ## License
 
