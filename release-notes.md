@@ -2,6 +2,10 @@
 
 ## Latest Changes
 
+### Internal
+
+* ♻️ Refactor GitHub Actions to improve token usage and credential persistence. PR [#68](https://github.com/mat81black/fastapi-validation-override/pull/68) by [@mat81black](https://github.com/mat81black).
+
 ## 1.1.1 (2026-08-08)
 
 ### Fixes
