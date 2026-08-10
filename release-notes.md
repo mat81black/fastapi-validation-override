@@ -4,6 +4,7 @@
 
 ### Internal
 
+* ♻️ Simplify patch_422_responses to match what get_openapi() actually produces. PR [#69](https://github.com/mat81black/fastapi-validation-override/pull/69) by [@mat81black](https://github.com/mat81black).
 * ♻️ Refactor GitHub Actions to improve token usage and credential persistence. PR [#68](https://github.com/mat81black/fastapi-validation-override/pull/68) by [@mat81black](https://github.com/mat81black).
 
 ## 1.1.1 (2026-08-08)
