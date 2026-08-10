@@ -63,10 +63,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh label create release --color 0075ca --description "Release PR" 2>/dev/null || true
-      - name: Authenticate git for push
-        env:
-          GH_TOKEN: ${{ secrets.FASTAPI_VALIDATION_OVER_LATEST_CHANGES }} # zizmor: ignore[secrets-outside-env]
-        run: git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
       - name: Create release pull request
         env:
           GH_TOKEN: ${{ secrets.FASTAPI_VALIDATION_OVER_LATEST_CHANGES }}
@@ -79,6 +75,7 @@ jobs:
           git switch -c "$branch"
           git add $PREPARE_RELEASE_VERSION_FILE $PREPARE_RELEASE_RELEASE_NOTES_FILE
           git commit -m "🔖 Release version ${VERSION}"
+          gh auth setup-git
           git push --set-upstream origin "$branch"
           gh pr create \
             --base main \

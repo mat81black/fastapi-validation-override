@@ -215,11 +215,9 @@ def test_prepare_section_already_exists(version_file: Path, notes_file: Path) ->
 def test_prepare_rolls_back_version_file_when_release_notes_write_fails(version_file: Path, notes_file: Path) -> None:
     original_version_content = version_file.read_text()
     original_write_text = Path.write_text
-    calls = {"n": 0}
 
     def flaky_write_text(self: Path, *args: object, **kwargs: object) -> int:
-        calls["n"] += 1
-        if calls["n"] == 2:  # the release notes file is the second write
+        if self == notes_file:
             raise OSError("disk full (simulated)")
         return original_write_text(self, *args, **kwargs)  # type: ignore[arg-type]
 

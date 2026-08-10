@@ -35,10 +35,6 @@ jobs:
             uv.lock
       - name: Bump pre-commit hooks
         run: uv run prek auto-update --freeze --cooldown-days 7
-      - name: Authenticate git for push
-        env:
-          GH_TOKEN: ${{ secrets.FASTAPI_VALIDATION_OVER_LATEST_CHANGES }} # zizmor: ignore[secrets-outside-env]
-        run: git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
       - name: Create pull request
         env:
           GH_TOKEN: ${{ secrets.FASTAPI_VALIDATION_OVER_LATEST_CHANGES }}
@@ -55,6 +51,7 @@ jobs:
           git switch -C "$branch"
           git add .pre-commit-config.yaml
           git commit -m "⬆ Bump pre-commit hooks"
+          gh auth setup-git
           git push --force origin "$branch"
           if [ -z "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
             gh pr create \
