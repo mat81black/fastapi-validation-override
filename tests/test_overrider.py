@@ -1039,7 +1039,10 @@ def test_patch_422_merge_target_response_false_still_synthesizes_when_target_abs
     assert responses["400"]["content"]["application/json"]["schema"]["$ref"].endswith("HTTPValidationError")
 
 
-def test_patch_422_target_as_local_response_ref_merges_on_inlined_copy() -> None:
+def test_patch_422_target_as_ref_is_always_left_untouched() -> None:
+    """A $ref at target_code is never merged into, even though it would resolve successfully —
+    patch_422_responses only ever receives get_openapi() output, which never declares a route's
+    own response as a $ref, so this module doesn't attempt to resolve one."""
     schema = {
         "paths": {
             "/items": {
@@ -1061,121 +1064,16 @@ def test_patch_422_target_as_local_response_ref_merges_on_inlined_copy() -> None
     result = patch_422_responses(schema, "400")
 
     response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
-    assert "$ref" not in response_400
-    content_schema = response_400["content"]["application/json"]["schema"]
-    assert "anyOf" in content_schema
-    assert len(content_schema["anyOf"]) == 2
-    # the shared component itself must stay untouched by the merge
-    shared_foo = result["components"]["responses"]["Foo"]
-    assert shared_foo["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/OutOfStockError"}
-
-
-def test_patch_422_target_as_external_response_ref_is_left_untouched() -> None:
-    schema = {
-        "paths": {
-            "/items": {
-                "post": _operation_with_422(**{"400": {"$ref": "external.yaml#/components/responses/Foo"}}),
+    assert response_400 == {"$ref": "#/components/responses/Foo"}
+    # the shared component is untouched, and no validation components were ever inserted
+    assert result["components"] == {
+        "responses": {
+            "Foo": {
+                "description": "Out of stock",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OutOfStockError"}}},
             }
         }
     }
-
-    result = patch_422_responses(schema, "400")
-
-    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
-    assert response_400 == {"$ref": "external.yaml#/components/responses/Foo"}
-    # no $ref to ValidationError/HTTPValidationError was ever written, so they must not be inserted
-    assert "components" not in result
-
-
-def test_patch_422_target_as_unresolvable_local_response_ref_is_left_untouched() -> None:
-    schema = {
-        "paths": {
-            "/items": {
-                "post": _operation_with_422(**{"400": {"$ref": "#/components/responses/Missing"}}),
-            }
-        }
-    }
-
-    result = patch_422_responses(schema, "400")
-
-    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
-    assert response_400 == {"$ref": "#/components/responses/Missing"}
-    # no $ref to ValidationError/HTTPValidationError was ever written, so they must not be inserted
-    assert "components" not in result
-
-
-def test_patch_422_target_as_chained_local_response_ref_merges_on_inlined_copy() -> None:
-    schema = {
-        "paths": {
-            "/items": {
-                "post": _operation_with_422(**{"400": {"$ref": "#/components/responses/Foo"}}),
-            }
-        },
-        "components": {
-            "responses": {
-                "Foo": {"$ref": "#/components/responses/Bar"},
-                "Bar": {
-                    "description": "Out of stock",
-                    "content": {
-                        "application/json": {"schema": {"$ref": "#/components/schemas/OutOfStockError"}},
-                    },
-                },
-            }
-        },
-    }
-
-    result = patch_422_responses(schema, "400")
-
-    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
-    assert "$ref" not in response_400
-    content_schema = response_400["content"]["application/json"]["schema"]
-    assert "anyOf" in content_schema
-    assert len(content_schema["anyOf"]) == 2
-    # the shared components must stay untouched by the merge
-    assert result["components"]["responses"]["Foo"] == {"$ref": "#/components/responses/Bar"}
-    shared_bar = result["components"]["responses"]["Bar"]
-    assert shared_bar["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/OutOfStockError"}
-
-
-def test_patch_422_target_as_cyclic_local_response_ref_is_left_untouched() -> None:
-    schema = {
-        "paths": {
-            "/items": {
-                "post": _operation_with_422(**{"400": {"$ref": "#/components/responses/Foo"}}),
-            }
-        },
-        "components": {
-            "responses": {
-                "Foo": {"$ref": "#/components/responses/Bar"},
-                "Bar": {"$ref": "#/components/responses/Foo"},
-            }
-        },
-    }
-
-    result = patch_422_responses(schema, "400")
-
-    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
-    assert response_400 == {"$ref": "#/components/responses/Foo"}
-
-
-def test_patch_422_target_as_local_response_ref_chained_to_external_is_left_untouched() -> None:
-    schema = {
-        "paths": {
-            "/items": {
-                "post": _operation_with_422(**{"400": {"$ref": "#/components/responses/Foo"}}),
-            }
-        },
-        "components": {
-            "responses": {
-                "Foo": {"$ref": "external.yaml#/components/responses/Bar"},
-            }
-        },
-    }
-
-    result = patch_422_responses(schema, "400")
-
-    response_400 = result["paths"]["/items"]["post"]["responses"]["400"]
-    assert response_400 == {"$ref": "#/components/responses/Foo"}
 
 
 # ── patch_422_responses: idempotenza su schema già patchato ─────────────────
@@ -1386,127 +1284,18 @@ def test_patch_422_callbacks_are_patched() -> None:
     assert "400" in result["paths"]["/items"]["post"]["responses"]
 
 
-def test_patch_422_ref_callback_is_resolved_and_patched() -> None:
+def test_patch_422_ref_callback_is_ignored() -> None:
+    """A callback declared as a $ref instead of an inline Path Item mapping is silently skipped:
+    get_openapi() never produces one, and this module doesn't resolve $refs."""
     main_operation = _operation_with_422()
     main_operation["callbacks"] = {"myCallback": {"$ref": "#/components/callbacks/EventCallback"}}
-    schema = {
-        "paths": {"/items": {"post": main_operation}},
-        "components": {
-            "callbacks": {
-                "EventCallback": {
-                    "{$callback_url}": {"post": _operation_with_422()},
-                }
-            }
-        },
-    }
-
-    result = patch_422_responses(schema, "400")
-
-    callback_responses = result["paths"]["/items"]["post"]["callbacks"]["myCallback"]["$ref"]
-    # the $ref itself is left untouched; the referenced component is patched in place
-    assert callback_responses == "#/components/callbacks/EventCallback"
-    patched_component = result["components"]["callbacks"]["EventCallback"]["{$callback_url}"]["post"]["responses"]
-    assert "422" not in patched_component
-    assert "400" in patched_component
-
-
-def test_patch_422_chained_ref_callback_is_resolved_and_patched() -> None:
-    main_operation = _operation_with_422()
-    main_operation["callbacks"] = {"myCallback": {"$ref": "#/components/callbacks/Foo"}}
-    schema = {
-        "paths": {"/items": {"post": main_operation}},
-        "components": {
-            "callbacks": {
-                "Foo": {"$ref": "#/components/callbacks/Bar"},
-                "Bar": {
-                    "{$callback_url}": {"post": _operation_with_422()},
-                },
-            }
-        },
-    }
-
-    result = patch_422_responses(schema, "400")
-
-    patched_component = result["components"]["callbacks"]["Bar"]["{$callback_url}"]["post"]["responses"]
-    assert "422" not in patched_component
-    assert "400" in patched_component
-
-
-def test_patch_422_cyclic_ref_callback_is_skipped() -> None:
-    main_operation = _operation_with_422()
-    main_operation["callbacks"] = {"myCallback": {"$ref": "#/components/callbacks/Foo"}}
-    schema = {
-        "paths": {"/items": {"post": main_operation}},
-        "components": {
-            "callbacks": {
-                "Foo": {"$ref": "#/components/callbacks/Bar"},
-                "Bar": {"$ref": "#/components/callbacks/Foo"},
-            }
-        },
-    }
-
-    result = patch_422_responses(schema, "400")
-
-    # the cycle is skipped entirely, but the main path is still patched
-    assert "400" in result["paths"]["/items"]["post"]["responses"]
-
-
-def test_patch_422_structurally_self_referential_callback_does_not_recurse_forever() -> None:
-    main_operation = _operation_with_422()
-    main_operation["callbacks"] = {"onEvent": {"$ref": "#/components/callbacks/EventCallback"}}
-    nested_operation = _operation_with_422()
-    # the callback's own nested operation refers back to the same component it lives inside of
-    nested_operation["callbacks"] = {"onAck": {"$ref": "#/components/callbacks/EventCallback"}}
-    schema = {
-        "paths": {"/items": {"post": main_operation}},
-        "components": {
-            "callbacks": {
-                "EventCallback": {
-                    "{$callback_url}": {"post": nested_operation},
-                }
-            }
-        },
-    }
-
-    result = patch_422_responses(schema, "400")
-
-    assert "400" in result["paths"]["/items"]["post"]["responses"]
-    patched_nested = result["components"]["callbacks"]["EventCallback"]["{$callback_url}"]["post"]["responses"]
-    assert "400" in patched_nested
-
-
-def test_patch_422_same_callback_reused_by_two_unrelated_operations_is_patched_for_both() -> None:
-    operation_a = _operation_with_422()
-    operation_a["callbacks"] = {"e": {"$ref": "#/components/callbacks/Shared"}}
-    operation_b = _operation_with_422()
-    operation_b["callbacks"] = {"e": {"$ref": "#/components/callbacks/Shared"}}
-    schema = {
-        "paths": {
-            "/subscribe-a": {"post": operation_a},
-            "/subscribe-b": {"post": operation_b},
-        },
-        "components": {
-            "callbacks": {
-                "Shared": {"{$callback_url}": {"post": _operation_with_422()}},
-            }
-        },
-    }
-
-    result = patch_422_responses(schema, "400")
-
-    assert "400" in result["paths"]["/subscribe-a"]["post"]["responses"]
-    assert "400" in result["paths"]["/subscribe-b"]["post"]["responses"]
-    shared_responses = result["components"]["callbacks"]["Shared"]["{$callback_url}"]["post"]["responses"]
-    assert "400" in shared_responses
-
-
-def test_patch_422_external_ref_callback_is_skipped() -> None:
-    main_operation = _operation_with_422()
-    main_operation["callbacks"] = {"myCallback": {"$ref": "external.yaml#/components/callbacks/EventCallback"}}
     schema = {"paths": {"/items": {"post": main_operation}}}
 
     result = patch_422_responses(schema, "400")
 
+    assert result["paths"]["/items"]["post"]["callbacks"]["myCallback"] == {
+        "$ref": "#/components/callbacks/EventCallback"
+    }
     assert "400" in result["paths"]["/items"]["post"]["responses"]
 
 
