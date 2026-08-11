@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 1.2.0 (2026-08-11)
+
 ### Internal
 
 * ♻️ Remove unused labeled/unlabeled events and label-checker job from workflows. PR [#72](https://github.com/mat81black/fastapi-validation-override/pull/72) by [@mat81black](https://github.com/mat81black).
