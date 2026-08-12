@@ -216,10 +216,16 @@ def test_prepare_rolls_back_version_file_when_release_notes_write_fails(version_
     original_version_content = version_file.read_text()
     original_write_text = Path.write_text
 
-    def flaky_write_text(self: Path, *args: object, **kwargs: object) -> int:
+    def flaky_write_text(
+        self: Path,
+        data: str,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> int:
         if self == notes_file:
             raise OSError("disk full (simulated)")
-        return original_write_text(self, *args, **kwargs)  # type: ignore[arg-type]
+        return original_write_text(self, data, encoding=encoding, errors=errors, newline=newline)
 
     with patch.object(Path, "write_text", flaky_write_text):
         result = runner.invoke(
