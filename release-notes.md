@@ -2,6 +2,10 @@
 
 ## Latest Changes
 
+### Internal
+
+* 👷 Tag CI action pins for sync tracking. PR [#74](https://github.com/mat81black/fastapi-validation-override/pull/74) by [@mat81black](https://github.com/mat81black).
+
 ## 1.2.0 (2026-08-11)
 
 ### Internal
