@@ -2,6 +2,10 @@
 
 ## Latest Changes
 
+### Internal
+
+* 👷 Replace actions/labeler with Latest Changes App auto-labeling. PR [#76](https://github.com/mat81black/fastapi-validation-override/pull/76) by [@mat81black](https://github.com/mat81black).
+
 ## 1.2.1 (2026-08-12)
 
 ### Internal
