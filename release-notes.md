@@ -4,6 +4,7 @@
 
 ### Internal
 
+* ⬆ Bump fastapi from 0.140.0 to 0.141.1. PR [#79](https://github.com/mat81black/fastapi-validation-override/pull/79) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * ⬆ Bump the python-packages group with 9 updates. PR [#78](https://github.com/mat81black/fastapi-validation-override/pull/78) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * ⬆ Bump the github-actions group with 2 updates. PR [#77](https://github.com/mat81black/fastapi-validation-override/pull/77) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * 👷 Replace actions/labeler with Latest Changes App auto-labeling. PR [#76](https://github.com/mat81black/fastapi-validation-override/pull/76) by [@mat81black](https://github.com/mat81black).
