@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 1.2.2 (2026-09-22)
+
 ### Internal
 
 * ⬆ Bump anyio from 4.14.1 to 4.14.2. PR [#85](https://github.com/mat81black/fastapi-validation-override/pull/85) by [@dependabot[bot]](https://github.com/apps/dependabot).
