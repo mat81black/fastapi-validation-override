@@ -4,6 +4,7 @@
 
 ### Internal
 
+* ⬆ Bump anyio from 4.14.1 to 4.14.2. PR [#85](https://github.com/mat81black/fastapi-validation-override/pull/85) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * ⬆ Bump the github-actions group with 3 updates. PR [#84](https://github.com/mat81black/fastapi-validation-override/pull/84) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * ⬆ Bump the python-packages group with 8 updates. PR [#83](https://github.com/mat81black/fastapi-validation-override/pull/83) by [@dependabot[bot]](https://github.com/apps/dependabot).
 * ⬆ Bump pre-commit hooks. PR [#82](https://github.com/mat81black/fastapi-validation-override/pull/82) by [@mat81black](https://github.com/mat81black).
